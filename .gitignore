@@ -55,7 +55,9 @@ Desktop.ini
 # Workspace miscellany — not source code
 # ---------------------------------------------------------------------------
 *.rar
+*.exe
 test.txt
 .claude/
+**/Tool/
 AN111_GD32H7xx_ruanjiankaifazhinan_Rev1.0.pdf
 AN212 GDemWin GD32H7xx系列移植指南_Rev1.1.pdf

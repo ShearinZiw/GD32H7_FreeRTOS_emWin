@@ -1,0 +1,71 @@
+#ifndef __BSP_I2C_TOUCH_H
+#define	__BSP_I2C_TOUCH_H
+
+#include "gd32h7xx.h"
+
+/* 这个地址只要与GD32外挂的I2C器件地址不一样即可 */
+#define TP_I2C_OWN_ADDRESS7                 0x0A
+
+/* STM32 I2C 快速模式 */
+#define I2C_SPEED                250000
+#define I2C_SPEED_TIME         (1000000/I2C_SPEED)
+
+/*设定使用的电容屏IIC设备地址*/
+
+/* 如果用的是4.3寸/5寸的RGB屏，其触摸芯片可能是GT1151QM，它的I2C地址不同，需要定义这个宏切换一下地址 */
+#define LCD_TOUCH_IC_GT1151QM
+
+#ifndef LCD_TOUCH_IC_GT1151QM
+    #define GTP_ADDRESS                      0xBA
+#else
+    #define GTP_ADDRESS                      0x28
+/* 4.3寸和5寸电容屏都用 GT1151QM 这个新触摸芯片，
+   只能选择这两个屏幕当中的一个，默认选5寸电容屏（定义宏为1选中）*/
+  #define TOUCH_GT1151QM_LCD_4_3    0   //使用的是4.3寸电容屏(GT1151QM)
+  #define TOUCH_GT1151QM_LCD_5      1   //使用的是5寸电容屏(GT1151QM)
+#endif
+
+/* 定义I2C总线连接的GPIO端口, 用户只需要修改下面4行代码即可任意改变SCL和SDA的引脚 */
+#define TP_I2C_SCL_GPIO_PORT	GPIOH			/* 时钟线GPIO端口 */
+#define TP_I2C_SDA_GPIO_PORT	GPIOH			/* 数据线GPIO端口 */
+#define TP_RCU_I2C_SCL_PORT 	RCU_GPIOH		/* 时钟线端口时钟 */
+#define TP_RCU_I2C_SDA_PORT 	RCU_GPIOH		/* 数据线GPIO端口时钟 */
+#define TP_I2C_SCL_GPIO_PIN		GPIO_PIN_7			/* 连接到SCL时钟线的GPIO */
+#define TP_I2C_SDA_GPIO_PIN		GPIO_PIN_8			/* 连接到SDA数据线的GPIO */
+
+/* 定义RST与INT, 用户只需要修改下面4行代码即可任意改变RST与INT的引脚 */
+#define TP_RST_GPIO_PORT	GPIOB			/* 时钟线GPIO端口 */
+#define TP_INT_GPIO_PORT	GPIOC			/* 数据线GPIO端口 */
+#define TP_RCU_RST_PORT 	RCU_GPIOB		/* 时钟线端口时钟 */
+#define TP_RCU_INT_PORT 	RCU_GPIOC		/* 数据线GPIO端口时钟 */
+#define TP_RST_GPIO_PIN		GPIO_PIN_1			/* 连接到RST时钟线的GPIO */
+#define TP_INT_GPIO_PIN		GPIO_PIN_13			/* 连接到INT数据线的GPIO */            
+#define TP_INT_READ()        gpio_input_bit_get(TP_INT_GPIO_PORT,TP_INT_GPIO_PIN)
+
+#if 0	/* 条件编译： 1 选择GPIO的库函数实现IO读写 */
+	#define TP_I2C_SCL_1()  gpio_bit_set(TP_I2C_SCL_GPIO_PORT, TP_I2C_SCL_GPIO_PIN)		/* SCL = 1 */
+	#define TP_I2C_SCL_0()  gpio_bit_reset(TP_I2C_SCL_GPIO_PORT, TP_I2C_SCL_GPIO_PIN)		/* SCL = 0 */
+            
+	#define TP_I2C_SDA_1()  gpio_bit_set(TP_I2C_SDA_GPIO_PORT, TP_I2C_SDA_GPIO_PIN)		/* SDA = 1 */
+	#define TP_I2C_SDA_0()  gpio_bit_reset(TP_I2C_SDA_GPIO_PORT, TP_I2C_SDA_GPIO_PIN)		/* SDA = 0 */
+            
+	#define TP_I2C_SDA_READ()  gpio_input_bit_get(TP_I2C_SDA_GPIO_PORT, TP_I2C_SDA_GPIO_PIN )	/* 读SDA口线状态 */
+#else	/* 这个分支选择直接寄存器操作实现IO读写 */
+    /*　注意：如下写法，在IAR最高级别优化时，会被编译器错误优化 */
+	#define TP_I2C_SCL_1()  GPIO_BOP(TP_I2C_SCL_GPIO_PORT)  = TP_I2C_SCL_GPIO_PIN				/* SCL = 1 */
+	#define TP_I2C_SCL_0()  GPIO_BC(TP_I2C_SCL_GPIO_PORT)   = TP_I2C_SCL_GPIO_PIN				/* SCL = 0 */
+            
+	#define TP_I2C_SDA_1()  GPIO_BOP(TP_I2C_SDA_GPIO_PORT)  = TP_I2C_SDA_GPIO_PIN				/* SDA = 1 */
+	#define TP_I2C_SDA_0()  GPIO_BC(TP_I2C_SDA_GPIO_PORT)   = TP_I2C_SDA_GPIO_PIN				/* SDA = 0 */
+            
+	#define TP_I2C_SDA_READ()  ((GPIO_ISTAT(TP_I2C_SDA_GPIO_PORT) & TP_I2C_SDA_GPIO_PIN ) != 0)	/* 读SDA口线状态 */
+#endif
+
+
+uint32_t GPT_I2C_WriteBytes(uint8_t ClientAddr,uint8_t* pBuffer,  uint8_t NumByteToWrite);
+uint32_t GPT_I2C_ReadBytes(uint8_t ClientAddr,uint8_t* pBuffer, uint16_t NumByteToRead);
+void GPT_I2C_Touch_Init(void);
+void GPT_I2C_ResetChip(void);
+
+
+#endif /* __BSP_I2C_TOUCH_H */

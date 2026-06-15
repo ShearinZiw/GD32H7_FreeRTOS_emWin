@@ -1,0 +1,11 @@
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/APPW_MainTask.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/Generated/Resource.h
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/Generated/Resource.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/Generated/APPWConf.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/Generated/ID_SCREEN_00.h
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/Generated/ID_SCREEN_00.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Source/CustomCode/ID_SCREEN_00_Slots.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Resource/Image/DARK_Button_Up_100x30.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Resource/Image/DARK_Button_Down_100x30.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Resource/Font/NettoOT_40_Normal_EXT_AA4.c
+C:/Users/Administrator/Desktop/FreeRTOS_LCD_GD/AppWizard/Resource/Text/APPW_Language_0.c
