@@ -15,6 +15,7 @@ Purpose     : AppWizard application entry point
 */
 
 #include "Generated/Resource.h"
+#include "GUI.h"
 
 /*********************************************************************
 *
@@ -29,6 +30,11 @@ void MainTask(void) {
   // Initialize AppWizard
   //
   APPW_Init(APPW_PROJECT_PATH);
+  //
+  // Note: If XBF font creation fails at runtime (AppWizard library
+  // internal font handling), manual font creation via GUI_XBF_CreateFont()
+  // with a memory callback and GUI_XBF_TYPE_PROP_AA4_EXT may be needed
+  // before APPW_CreateRoot(). See CLAUDE.md for details.
   //
   // Create all persistent screens except initial screen
   //

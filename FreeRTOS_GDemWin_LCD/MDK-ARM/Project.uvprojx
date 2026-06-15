@@ -339,7 +339,7 @@
               <MiscControls>-Wno-invalid-source-encoding</MiscControls>
               <Define>USE_GDEMWIN</Define>
               <Undefine></Undefine>
-              <IncludePath>..\User;..\User\systick;..\User\lcd;..\User\sdram;..\User\usart;..\User\led;..\User\gui;..\GD32H7xx_GDemWin652\Include;..\FreeRTOS\include;..\FreeRTOS;..\FreeRTOS\portable\GCC\ARM_CM7\r0p1;..\FreeRTOS\portable\MemMang;..\Firmware\CMSIS\GD\GD32H7xx\Include;..\Firmware\GD32H7xx_standard_peripheral\Include</IncludePath>
+              <IncludePath>..\User;..\User\systick;..\User\lcd;..\User\sdram;..\User\usart;..\User\led;..\User\gui;..\User\touch;..\GD32H7xx_GDemWin652\Include;..\FreeRTOS\include;..\FreeRTOS;..\FreeRTOS\portable\GCC\ARM_CM7\r0p1;..\FreeRTOS\portable\MemMang;..\Firmware\CMSIS\GD\GD32H7xx\Include;..\Firmware\GD32H7xx_standard_peripheral\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -812,6 +812,21 @@
               <FileType>1</FileType>
               <FilePath>..\User\dwt\bsp_dwt_delay.c</FilePath>
             </File>
+            <File>
+              <FileName>bsp_i2c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\touch\bsp_i2c.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_gt1151qm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\touch\bsp_gt1151qm.c</FilePath>
+            </File>
+            <File>
+              <FileName>touch_task.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\touch\touch_task.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -999,6 +1014,154 @@
               <FileName>heap_4.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\FreeRTOS\portable\MemMang\heap_4.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>AppWizardSource</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>1</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+            </CommonProperty>
+            <GroupArmAds>
+              <Cads>
+                <interw>2</interw>
+                <Optim>0</Optim>
+                <oTime>2</oTime>
+                <SplitLS>2</SplitLS>
+                <OneElfS>2</OneElfS>
+                <Strict>2</Strict>
+                <EnumInt>2</EnumInt>
+                <PlainCh>2</PlainCh>
+                <Ropi>2</Ropi>
+                <Rwpi>2</Rwpi>
+                <wLevel>0</wLevel>
+                <uThumb>2</uThumb>
+                <uSurpInc>2</uSurpInc>
+                <uC99>2</uC99>
+                <useXO>2</useXO>
+                <v6Lang>3</v6Lang>
+                <v6LangP>3</v6LangP>
+                <vShortEn>2</vShortEn>
+                <vShortWch>2</vShortWch>
+                <v6Lto>2</v6Lto>
+                <v6WtE>2</v6WtE>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath>..\..\AppWizard\Source;..\..\AppWizard\Source\Generated</IncludePath>
+                </VariousControls>
+              </Cads>
+            </GroupArmAds>
+          </GroupOption>
+          <Files>
+            <File>
+              <FileName>Application.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\CustomCode\Application.c</FilePath>
+            </File>
+            <File>
+              <FileName>ID_SCREEN_00_Slots.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\CustomCode\ID_SCREEN_00_Slots.c</FilePath>
+            </File>
+            <File>
+              <FileName>Resource.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\Generated\Resource.c</FilePath>
+            </File>
+            <File>
+              <FileName>ID_SCREEN_00.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\Generated\ID_SCREEN_00.c</FilePath>
+            </File>
+            <File>
+              <FileName>APPWConf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\Generated\APPWConf.c</FilePath>
+            </File>
+            <File>
+              <FileName>APPW_MainTask.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Source\APPW_MainTask.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>AppWizardResource</GroupName>
+          <GroupOption>
+            <CommonProperty>
+              <UseCPPCompiler>0</UseCPPCompiler>
+              <RVCTCodeConst>0</RVCTCodeConst>
+              <RVCTZI>0</RVCTZI>
+              <RVCTOtherData>0</RVCTOtherData>
+              <ModuleSelection>0</ModuleSelection>
+              <IncludeInBuild>1</IncludeInBuild>
+              <AlwaysBuild>2</AlwaysBuild>
+              <GenerateAssemblyFile>2</GenerateAssemblyFile>
+              <AssembleAssemblyFile>2</AssembleAssemblyFile>
+              <PublicsOnly>2</PublicsOnly>
+              <StopOnExitCode>11</StopOnExitCode>
+              <CustomArgument></CustomArgument>
+              <IncludeLibraryModules></IncludeLibraryModules>
+              <ComprImg>1</ComprImg>
+            </CommonProperty>
+            <GroupArmAds>
+              <Cads>
+                <interw>2</interw>
+                <Optim>0</Optim>
+                <oTime>2</oTime>
+                <SplitLS>2</SplitLS>
+                <OneElfS>2</OneElfS>
+                <Strict>2</Strict>
+                <EnumInt>2</EnumInt>
+                <PlainCh>2</PlainCh>
+                <Ropi>2</Ropi>
+                <Rwpi>2</Rwpi>
+                <wLevel>0</wLevel>
+                <uThumb>2</uThumb>
+                <uSurpInc>2</uSurpInc>
+                <uC99>2</uC99>
+                <useXO>2</useXO>
+                <v6Lang>3</v6Lang>
+                <v6LangP>3</v6LangP>
+                <vShortEn>2</vShortEn>
+                <vShortWch>2</vShortWch>
+                <v6Lto>2</v6Lto>
+                <v6WtE>2</v6WtE>
+                <VariousControls>
+                  <MiscControls></MiscControls>
+                  <Define></Define>
+                  <Undefine></Undefine>
+                  <IncludePath>..\GD32H7xx_GDemWin652\Include</IncludePath>
+                </VariousControls>
+              </Cads>
+            </GroupArmAds>
+          </GroupOption>
+          <Files>
+            <File>
+              <FileName>NettoOT_40_Normal_EXT_AA4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Resource\Font\NettoOT_40_Normal_EXT_AA4.c</FilePath>
+            </File>
+            <File>
+              <FileName>APPW_Language_0.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\AppWizard\Resource\Text\APPW_Language_0.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -25,6 +25,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "GUI.h"
+#include "touch/touch_task.h"
 
 static TaskHandle_t AppTaskCreate_Handle = NULL;
 static TaskHandle_t GUITask_Handle = NULL;
@@ -35,6 +36,7 @@ static void HW_Init(void);
 static void AppTaskCreate(void *pvParameters);
 static void GUITask(void *pvParameters);
 static void LEDTask(void *pvParameters);
+extern void MainTask(void);  /* Defined in AppWizard/Source/APPW_MainTask.c */
 
 static void BOARD_ConfigMPU(void)
 {
@@ -74,6 +76,7 @@ static void AppTaskCreate(void *pvParameters)
 {
     (void)pvParameters;
     xTaskCreate(LEDTask, "LEDTask", 256, NULL, 1, NULL);
+    TouchTask_Create();
     xTaskCreate(GUITask, "GUITask", 4096, NULL, 2, &GUITask_Handle);
     vTaskDelete(AppTaskCreate_Handle);
 }
@@ -84,35 +87,12 @@ static void GUITask(void *pvParameters)
 
     GUI_Init();
 
-    /* White background */
+#if 0  /* Bare emWin demo — kept for reference, AppWizard is active path */
     GUI_SetBkColor(GUI_WHITE);
     GUI_Clear();
-
-    /* Title */
     GUI_SetFont(&GUI_Font24_ASCII);
     GUI_SetColor(GUI_BLUE);
     GUI_DispStringAt("FreeRTOS + GDemWin V6.52", 50, 30);
-    GUI_SetFont(&GUI_Font16_ASCII);
-    GUI_SetColor(GUI_BLACK);
-    GUI_DispStringAt("GD32H759IMK6 | 5-inch LCD | 800x480 RGB565", 50, 65);
-    GUI_SetColor(GUI_BLUE);
-    GUI_DrawHLine(90, 50, 750);
-
-    /* Shapes */
-    GUI_SetColor(GUI_GREEN);
-    GUI_FillCircle(200, 300, 60);
-    GUI_SetColor(GUI_RED);
-    GUI_FillRect(400, 240, 520, 360);
-    GUI_SetColor(GUI_MAGENTA);
-    GUI_FillPolygon(
-        (const GUI_POINT[]){{620,240},{700,200},{760,260},{720,360},{580,350}}, 5, 1, 1);
-    GUI_SetFont(&GUI_Font16_ASCII);
-    GUI_SetColor(GUI_BLACK);
-    GUI_DispStringAt("Circle", 168, 370);
-    GUI_DispStringAt("Rect", 430, 378);
-    GUI_DispStringAt("Poly", 655, 378);
-
-    /* Uptime */
     unsigned int counter = 0;
     while (1) {
         char buf[64];
@@ -122,11 +102,11 @@ static void GUITask(void *pvParameters)
         GUI_SetColor(GUI_BLACK);
         sprintf(buf, "Uptime: %u s", counter++);
         GUI_DispStringAt(buf, 50, 150);
-        GUI_SetFont(&GUI_Font16_ASCII);
-        GUI_SetColor(GUI_GRAY);
-        GUI_DispStringAt("emWin on FreeRTOS | 64KB pool via GUI_ALLOC_AssignMemory", 50, 180);
         GUI_Delay(1000);
     }
+#else
+    MainTask();  /* AppWizard entry point — never returns */
+#endif
 }
 
 static void LEDTask(void *pvParameters)

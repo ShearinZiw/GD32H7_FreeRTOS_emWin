@@ -28,11 +28,10 @@
 
 /*********************************************************************
 *       Touch support
-*       Disabled for initial build. Enable when GT1151QM driver is
-*       added and GUI_PID_StoreState() is called.
-*       When set to 1, also add GUI_X_Touch.c to the project.
+*       GT1151QM touch driver integrated (I2C bit-bang on PH7/PH8).
+*       TouchTask polls at 50 Hz and calls GUI_PID_StoreState().
 **********************************************************************/
-#define GUI_SUPPORT_TOUCH         0
+#define GUI_SUPPORT_TOUCH         1
 
 /*********************************************************************
 *       Window manager
