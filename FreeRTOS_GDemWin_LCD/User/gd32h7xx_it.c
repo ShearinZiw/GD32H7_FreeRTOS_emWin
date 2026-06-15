@@ -35,70 +35,54 @@ OF SUCH DAMAGE.
 #include "gd32h7xx_it.h"
 #include "main.h"
 #include "systick/systick.h"
-/*!
-    \brief      this function handles NMI exception
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
+#include <stdio.h>
+
+/* Quick blink on LED1 for visual fault indication */
+static void FaultBlink(int n) {
+    rcu_periph_clock_enable(RCU_GPIOD);
+    gpio_mode_set(GPIOD, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO_PIN_11);
+    gpio_output_options_set(GPIOD, GPIO_OTYPE_PP, GPIO_OSPEED_100_220MHZ, GPIO_PIN_11);
+    while (1) {
+        for (int i = 0; i < n; i++) {
+            gpio_bit_reset(GPIOD, GPIO_PIN_11);  /* LED ON */
+            for (volatile int d = 0; d < 5000000; d++);
+            gpio_bit_set(GPIOD, GPIO_PIN_11);    /* LED OFF */
+            for (volatile int d = 0; d < 5000000; d++);
+        }
+        for (volatile int d = 0; d < 20000000; d++);  /* long pause between blinks */
+    }
+}
+
 void NMI_Handler(void)
 {
-    /* if NMI exception occurs, go to infinite loop */
-    while(1) {
-    }
+    printf("\r\n!!! NMI FAULT !!!\r\n");
+    FaultBlink(1);
 }
 
-/*!
-    \brief      this function handles HardFault exception
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
 void HardFault_Handler(void)
 {
-    /* if Hard Fault exception occurs, go to infinite loop */
-    while(1) {
-    }
+    printf("\r\n!!! HARDFAULT !!!\r\n");
+    FaultBlink(2);
 }
 
-/*!
-    \brief      this function handles MemManage exception
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
 void MemManage_Handler(void)
 {
-    /* if Memory Manage exception occurs, go to infinite loop */
-    while(1) {
-    }
+    printf("\r\n!!! MEMMANAGE FAULT !!!\r\n");
+    FaultBlink(3);
 }
 
-/*!
-    \brief      this function handles BusFault exception
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
 void BusFault_Handler(void)
 {
-    /* if Bus Fault exception occurs, go to infinite loop */
-    while(1) {
-    }
+    printf("\r\n!!! BUSFAULT !!!\r\n");
+    FaultBlink(4);
 }
 
-/*!
-    \brief      this function handles UsageFault exception
-    \param[in]  none
-    \param[out] none
-    \retval     none
-*/
 void UsageFault_Handler(void)
 {
-    /* if Usage Fault exception occurs, go to infinite loop */
-    while(1) {
-    }
+    printf("\r\n!!! USAGEFAULT !!!\r\n");
+    FaultBlink(5);
 }
+
 
 /*!
     \brief      this function handles DebugMon exception

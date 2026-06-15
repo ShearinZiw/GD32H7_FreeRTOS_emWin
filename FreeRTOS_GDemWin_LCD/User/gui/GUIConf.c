@@ -11,8 +11,8 @@
 
 #include "GUI.h"
 
-/* 128KB memory pool for emWin internal allocations (AppWizard + XBF fonts) */
-static unsigned char _GUI_Memory[128 * 1024] __attribute__((aligned(32)));
+/* 256KB memory pool for emWin internal allocations (AppWizard + XBF fonts + widgets) */
+static unsigned char _GUI_Memory[256 * 1024] __attribute__((aligned(32)));
 
 void GUI_X_Config(void)
 {

@@ -77,7 +77,7 @@ static void AppTaskCreate(void *pvParameters)
     (void)pvParameters;
     xTaskCreate(LEDTask, "LEDTask", 256, NULL, 1, NULL);
     TouchTask_Create();
-    xTaskCreate(GUITask, "GUITask", 4096, NULL, 2, &GUITask_Handle);
+    xTaskCreate(GUITask, "GUITask", 8192, NULL, 2, &GUITask_Handle);
     vTaskDelete(AppTaskCreate_Handle);
 }
 
@@ -87,26 +87,7 @@ static void GUITask(void *pvParameters)
 
     GUI_Init();
 
-#if 0  /* Bare emWin demo — kept for reference, AppWizard is active path */
-    GUI_SetBkColor(GUI_WHITE);
-    GUI_Clear();
-    GUI_SetFont(&GUI_Font24_ASCII);
-    GUI_SetColor(GUI_BLUE);
-    GUI_DispStringAt("FreeRTOS + GDemWin V6.52", 50, 30);
-    unsigned int counter = 0;
-    while (1) {
-        char buf[64];
-        GUI_SetColor(GUI_WHITE);
-        GUI_FillRect(50, 140, 750, 200);
-        GUI_SetFont(&GUI_Font20_ASCII);
-        GUI_SetColor(GUI_BLACK);
-        sprintf(buf, "Uptime: %u s", counter++);
-        GUI_DispStringAt(buf, 50, 150);
-        GUI_Delay(1000);
-    }
-#else
     MainTask();  /* AppWizard entry point — never returns */
-#endif
 }
 
 static void LEDTask(void *pvParameters)

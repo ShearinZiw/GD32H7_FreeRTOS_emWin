@@ -32,23 +32,29 @@ void GUI_X_ExecIdle(void)
 
 /*===========================================================================
  * Multitasking (GUI_OS = 1)
+ *
+ * IMPORTANT: Uses a recursive mutex, NOT a counting semaphore.
+ * AppWizard internally nests GUI API calls (e.g. APPW_CreateRoot
+ * calls WM/GUI functions which also try to acquire the lock).
+ * A counting semaphore with max=1 deadlocks on re-entrant locking;
+ * a recursive mutex allows the same task to lock multiple times.
  *===========================================================================*/
 void GUI_X_InitOS(void)
 {
-    _GUISemaphore = xSemaphoreCreateCounting(1, 1);
+    _GUISemaphore = xSemaphoreCreateRecursiveMutex();
 }
 
 void GUI_X_Lock(void)
 {
     if (_GUISemaphore != NULL) {
-        xSemaphoreTake(_GUISemaphore, portMAX_DELAY);
+        xSemaphoreTakeRecursive(_GUISemaphore, portMAX_DELAY);
     }
 }
 
 void GUI_X_Unlock(void)
 {
     if (_GUISemaphore != NULL) {
-        xSemaphoreGive(_GUISemaphore);
+        xSemaphoreGiveRecursive(_GUISemaphore);
     }
 }
 

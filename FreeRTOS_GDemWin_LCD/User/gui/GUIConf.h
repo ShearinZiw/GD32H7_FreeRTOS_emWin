@@ -57,9 +57,9 @@
 *       Dynamic memory pool size for emWin (bytes)
 *       emWin uses this pool internally for windows, widgets,
 *       clip rectangles, font cache, etc.
-*       128KB for AppWizard + XBF font caching + multi-widget screens.
+*       256KB for AppWizard + XBF font caching + multi-widget screens.
 **********************************************************************/
-#define GUI_ALLOC_SIZE            131072
+#define GUI_ALLOC_SIZE            262144
 
 /*********************************************************************
 *       Color format
