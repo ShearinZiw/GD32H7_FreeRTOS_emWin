@@ -15,6 +15,7 @@
 #include "touch/bsp_gt1151qm.h"
 #include "touch/bsp_i2c.h"
 #include "dwt/bsp_dwt_delay.h"
+#include "dwt/bsp_dwt_delay.h"
 
 /*===========================================================================
  * I2C helper structures and functions
@@ -157,8 +158,22 @@ int32_t GTP_Init_Panel(void)
     }
 
     GTP_Read_Version();
+
+    /* Soft reset + set normal operating mode */
+    {
+        uint8_t cmd[3] = { 0x80, 0x40, 0x02 };
+        GTP_I2C_Write(GTP_ADDRESS, cmd, 3);
+        CPU_TS_Tmr_Delay_US(50000);
+        cmd[2] = 0x00;  /* Read coordinates mode */
+        GTP_I2C_Write(GTP_ADDRESS, cmd, 3);
+        CPU_TS_Tmr_Delay_US(10000);
+    }
+
     GTP_IRQ_Enable();
     GTP_INFO("GT1151QM init OK (800x480)");
+    /* NOTE: If touch doesn't detect, check flex cable connection.
+     *       The chip communicates fine (I2C OK, config valid 800x480)
+     *       but touch sensor may need hardware verification. */
 
     return 0;
 }
@@ -190,7 +205,6 @@ int GTP_Execu(int *x, int *y)
     int32_t  input_x = 0;
     int32_t  input_y = 0;
     int32_t  ret;
-
     ret = GTP_I2C_Read(GTP_ADDRESS, point_data, 12);
     if (ret < 0) {
         return 0;
@@ -213,6 +227,12 @@ int GTP_Execu(int *x, int *y)
 
     input_x = point_data[3 + 1] | (point_data[3 + 2] << 8);
     input_y = point_data[3 + 3] | (point_data[3 + 4] << 8);
+
+    /* Clear touch buffer after read (required by GT1151QM protocol) */
+    {
+        uint8_t end_cmd[3] = { GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF, 0 };
+        GTP_I2C_Write(GTP_ADDRESS, end_cmd, 3);
+    }
 
     if (input_x < GTP_MAX_WIDTH && input_y < GTP_MAX_HEIGHT) {
         *x = input_x;

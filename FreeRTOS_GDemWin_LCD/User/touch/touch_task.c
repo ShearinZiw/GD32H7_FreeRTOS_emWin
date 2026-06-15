@@ -30,12 +30,10 @@ static void TouchTask(void *pvParameters)
     int x, y;
     TickType_t xLastWake = xTaskGetTickCount();
 
-    /* Initialize touch controller hardware */
     GTP_Init_Panel();
 
     while (1) {
         if (GTP_Execu(&x, &y) == 1) {
-            /* Touch detected — send to emWin */
             GUI_PID_STATE State;
             State.x       = x;
             State.y       = y;
@@ -43,7 +41,6 @@ static void TouchTask(void *pvParameters)
             State.Layer   = 0;
             GUI_PID_StoreState(&State);
         } else {
-            /* No touch — send release to emWin */
             GUI_PID_STATE State;
             State.x       = 0;
             State.y       = 0;
@@ -51,7 +48,6 @@ static void TouchTask(void *pvParameters)
             State.Layer   = 0;
             GUI_PID_StoreState(&State);
         }
-
         vTaskDelayUntil(&xLastWake, pdMS_TO_TICKS(TOUCH_POLL_PERIOD_MS));
     }
 }

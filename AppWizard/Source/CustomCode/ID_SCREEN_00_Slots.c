@@ -23,8 +23,10 @@ Purpose     : AppWizard managed file, function content could be changed
 
 /* Triggered when BUTTON_00 is clicked — demo multimedia from SD card */
 static void _OnButtonClick(void) {
+  /* Immediate feedback: change text of first text widget */
+  APPW_SetText(ID_SCREEN_00, ID_TEXT_00, "Clicked!");
+  /* Try loading images from SD card (silent fail if files missing) */
   GUI_Demo_JPEG("0:/test.jpg", 400, 200);
-  GUI_Demo_GIF("0:/test.gif", 400, 200);
 }
 
 /*** End of user code area ***/
