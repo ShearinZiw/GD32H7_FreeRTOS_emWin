@@ -13,7 +13,7 @@
 #include "ff.h"
 #include <string.h>
 
-#define DEMO_BUF_SIZE  (512 * 1024)   /* 512KB shared buffer for media loading */
+#define DEMO_BUF_SIZE  (128 * 1024)   /* 128KB shared buffer for media loading */
 static U8 _demo_buf[DEMO_BUF_SIZE] __attribute__((aligned(32)));
 
 /*===========================================================================
