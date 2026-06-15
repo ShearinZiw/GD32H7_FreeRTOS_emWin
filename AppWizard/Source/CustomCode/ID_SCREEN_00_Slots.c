@@ -17,8 +17,16 @@ Purpose     : AppWizard managed file, function content could be changed
 #include "Application.h"
 #include "../Generated/Resource.h"
 #include "../Generated/ID_SCREEN_00.h"
+#include "GUI_Demo.h"
 
 /*** Begin of user code area ***/
+
+/* Triggered when BUTTON_00 is clicked — demo multimedia from SD card */
+static void _OnButtonClick(void) {
+  GUI_Demo_JPEG("0:/test.jpg", 400, 200);
+  GUI_Demo_GIF("0:/test.gif", 400, 200);
+}
+
 /*** End of user code area ***/
 
 /*********************************************************************
@@ -27,23 +35,16 @@ Purpose     : AppWizard managed file, function content could be changed
 *
 **********************************************************************
 */
-/*********************************************************************
-*
-*       cbID_SCREEN_00
-*/
 void cbID_SCREEN_00(WM_MESSAGE * pMsg) {
   GUI_USE_PARA(pMsg);
 }
 
-/*********************************************************************
-*
-*       ID_SCREEN_00__ID_BUTTON_00__WM_NOTIFICATION_SET__ID_TEXT_00_Copy__APPW_JOB_SETCOLOR
-*/
 void ID_SCREEN_00__ID_BUTTON_00__WM_NOTIFICATION_SET__ID_TEXT_00_Copy__APPW_JOB_SETCOLOR(APPW_ACTION_ITEM * pAction, WM_HWIN hScreen, WM_MESSAGE * pMsg, int * pResult) {
   GUI_USE_PARA(pAction);
   GUI_USE_PARA(hScreen);
   GUI_USE_PARA(pMsg);
   GUI_USE_PARA(pResult);
+  _OnButtonClick();
 }
 
 /*************************** End of file ****************************/
