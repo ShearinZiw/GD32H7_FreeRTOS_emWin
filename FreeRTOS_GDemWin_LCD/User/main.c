@@ -74,7 +74,7 @@ static void AppTaskCreate(void *pvParameters)
 {
     (void)pvParameters;
     xTaskCreate(LEDTask, "LEDTask", 256, NULL, 1, NULL);
-    xTaskCreate(GUITask, "GUITask", 2048, NULL, 2, &GUITask_Handle);
+    xTaskCreate(GUITask, "GUITask", 4096, NULL, 2, &GUITask_Handle);
     vTaskDelete(AppTaskCreate_Handle);
 }
 

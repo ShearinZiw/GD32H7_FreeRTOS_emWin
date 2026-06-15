@@ -41,6 +41,12 @@
 **********************************************************************/
 #define GUI_WINSUPPORT            1
 
+/*********************************************************************
+*       Memory device support
+*       Required for AppWizard. Without it, AppWizard.h:74 preprocessor
+*       guard excludes all AppWizard types, causing build errors.
+**********************************************************************/
+#define GUI_SUPPORT_MEMDEV        1
 
 /*********************************************************************
 *       Default font
@@ -52,17 +58,18 @@
 *       Dynamic memory pool size for emWin (bytes)
 *       emWin uses this pool internally for windows, widgets,
 *       clip rectangles, font cache, etc.
-*       64KB is sufficient for moderate widget counts.
+*       128KB for AppWizard + XBF font caching + multi-widget screens.
 **********************************************************************/
-#define GUI_ALLOC_SIZE            65536
+#define GUI_ALLOC_SIZE            131072
 
 /*********************************************************************
 *       Color format
 *       0 = ABGR format (standard emWin default)
 *       1 = ARGB format
-*       Keep at 0 for standard compatibility.
+*       MUST be 1 for AppWizard — the precompiled GDemWin_CM7_OS_DP.lib
+*       was built with ARGB byte order.
 **********************************************************************/
-#define GUI_USE_ARGB              0
+#define GUI_USE_ARGB              1
 
 /*********************************************************************
 *       Memory device / custom draw support
