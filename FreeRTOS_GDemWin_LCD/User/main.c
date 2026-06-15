@@ -11,7 +11,8 @@
  *   - SVC/PendSV/SysTick handlers removed from gd32h7xx_it.c (FreeRTOS provides)
  *
  * Working hardware init sequence (from TLI_LCD_5inches):
- *   MPU → ICache/DCache → NVIC → USART → SDRAM → TLI LCD → LED → FreeRTOS
+ *   MPU → ICache/DCache → NVIC → USART → SDRAM → SD+FatFS → TLI LCD → LED
+ *   → FreeRTOS
  ******************************************************************************
  */
 
@@ -20,12 +21,17 @@
 #include "lcd/bsp_lcd.h"
 #include "sdram/bsp_exmc_sdram.h"
 #include "led/bsp_gpio_led.h"
+#include "sdio/bsp_sdio_sdcard.h"
 #include <stdio.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "GUI.h"
 #include "touch/touch_task.h"
+#include "fatfs/ff.h"
+#include "fatfs/diskio.h"
+
+extern int FS_Init(void);   /* GUI_X_FS.c — mounts SD + OSPI */
 
 static TaskHandle_t AppTaskCreate_Handle = NULL;
 static TaskHandle_t GUITask_Handle = NULL;
@@ -40,9 +46,14 @@ extern void MainTask(void);  /* Defined in AppWizard/Source/APPW_MainTask.c */
 
 static void BOARD_ConfigMPU(void)
 {
+    /* Region 1: SDRAM 0xC0000000, 4 MB, non-cacheable (TLI DMA) */
     MPU->RBAR = ARM_MPU_RBAR(1, 0xC0000000U);
     MPU->RASR = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 1, 0, 0, 0, 0,
                              ARM_MPU_REGION_SIZE_4MB);
+    /* Region 2: OSPI Flash MM 0x90000000, 256 MB, non-cacheable */
+    MPU->RBAR = ARM_MPU_RBAR(2, 0x90000000U);
+    MPU->RASR = ARM_MPU_RASR(0, ARM_MPU_AP_FULL, 1, 0, 0, 0, 0,
+                             ARM_MPU_REGION_SIZE_256MB);
     ARM_MPU_Enable(MPU_CTRL_PRIVDEFENA_Msk);
     SCB_EnableICache();
     SCB_EnableDCache();
@@ -56,6 +67,15 @@ static void HW_Init(void)
     printf("\r\n=== FreeRTOS + GDemWin + 5-inch LCD ===\r\n");
     exmc_synchronous_dynamic_ram_init(EXMC_SDRAM_DEVICE0);
     printf("SDRAM OK | ");
+
+    /* Initialize SD card and mount FatFS */
+    if (disk_initialize(0) == RES_OK) {
+        printf("SD OK | ");
+    } else {
+        printf("SD FAIL | ");
+    }
+    FS_Init();
+
     BSP_LCD_Init();
     LCD_LayerInit();
     printf("LCD OK | ");

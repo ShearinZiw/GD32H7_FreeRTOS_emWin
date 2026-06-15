@@ -339,7 +339,7 @@
               <MiscControls>-Wno-invalid-source-encoding</MiscControls>
               <Define>USE_GDEMWIN</Define>
               <Undefine></Undefine>
-              <IncludePath>..\User;..\User\systick;..\User\lcd;..\User\sdram;..\User\usart;..\User\led;..\User\gui;..\User\touch;..\GD32H7xx_GDemWin652\Include;..\FreeRTOS\include;..\FreeRTOS;..\FreeRTOS\portable\GCC\ARM_CM7\r0p1;..\FreeRTOS\portable\MemMang;..\Firmware\CMSIS\GD\GD32H7xx\Include;..\Firmware\GD32H7xx_standard_peripheral\Include</IncludePath>
+              <IncludePath>..\User;..\User\systick;..\User\lcd;..\User\sdram;..\User\usart;..\User\led;..\User\gui;..\User\touch;..\User\sdio;..\User\fatfs;..\User\ospi;..\GD32H7xx_GDemWin652\Include;..\FreeRTOS\include;..\FreeRTOS;..\FreeRTOS\portable\GCC\ARM_CM7\r0p1;..\FreeRTOS\portable\MemMang;..\Firmware\CMSIS\GD\GD32H7xx\Include;..\Firmware\GD32H7xx_standard_peripheral\Include</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -777,6 +777,11 @@
               <FileType>4</FileType>
               <FilePath>..\GD32H7xx_GDemWin652\Lib\GDemWin_CM7_OS_DP.lib</FilePath>
             </File>
+            <File>
+              <FileName>GUI_X_FS.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\gui\GUI_X_FS.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -826,6 +831,51 @@
               <FileName>touch_task.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\touch\touch_task.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_ospi_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\ospi\bsp_ospi_flash.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>SDIO</GroupName>
+          <Files>
+            <File>
+              <FileName>bsp_sdio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\sdio\bsp_sdio.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_sdio_sdcard.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\sdio\bsp_sdio_sdcard.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>FatFS</GroupName>
+          <Files>
+            <File>
+              <FileName>ff.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fatfs\ff.c</FilePath>
+            </File>
+            <File>
+              <FileName>diskio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fatfs\diskio.c</FilePath>
+            </File>
+            <File>
+              <FileName>syscall.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fatfs\syscall.c</FilePath>
+            </File>
+            <File>
+              <FileName>cc936.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\fatfs\cc936.c</FilePath>
             </File>
           </Files>
         </Group>
