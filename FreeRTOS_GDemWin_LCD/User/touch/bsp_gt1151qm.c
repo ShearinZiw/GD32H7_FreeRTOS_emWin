@@ -138,7 +138,7 @@ int32_t GTP_Read_Version(void)
 
 static void GTP_IRQ_Enable(void)
 {
-    gpio_mode_set(TP_INT_GPIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, TP_INT_GPIO_PIN);
+    gpio_mode_set(TP_INT_GPIO_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, TP_INT_GPIO_PIN);
 }
 
 /*===========================================================================
