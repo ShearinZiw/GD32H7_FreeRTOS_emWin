@@ -1,12 +1,9 @@
 /**
  *********************************************************************
  * @file    bsp_gt1151qm.c
- * @brief   GT1151QM capacitive touch controller driver
+ * @brief   GT1151QM touch driver — uses proven Goodix_TS_Work_Func
  *
- * Communicates via bit-bang I2C (PH7=SCL, PH8=SDA).
- * Single-touch coordinate reading from register 0x814E.
- *
- * Adapted from TLI_LCD_TOUCH reference project.
+ * Touch data flow: Goodix_TS_Work_Func() → g_tp_* globals → GTP_Execu()
  *********************************************************************
  */
 
@@ -15,10 +12,9 @@
 #include "touch/bsp_gt1151qm.h"
 #include "touch/bsp_i2c.h"
 #include "dwt/bsp_dwt_delay.h"
-#include "dwt/bsp_dwt_delay.h"
 
 /*===========================================================================
- * I2C helper structures and functions
+ * I2C helper structures
  *===========================================================================*/
 
 #define I2C_M_RD        0x0001
@@ -33,100 +29,62 @@ struct i2c_msg {
 
 static int I2C_Transfer(struct i2c_msg *msgs, int num)
 {
-    int im;
-    int ret = 0;
-
+    int im, ret = 0;
     for (im = 0; ret == 0 && im != num; im++) {
-        if (msgs[im].flags & I2C_M_RD) {
+        if (msgs[im].flags & I2C_M_RD)
             ret = GPT_I2C_ReadBytes(msgs[im].addr, msgs[im].buf, msgs[im].len);
-        } else {
+        else
             ret = GPT_I2C_WriteBytes(msgs[im].addr, msgs[im].buf, msgs[im].len);
-        }
     }
-    return (ret) ? ret : im;
+    return ret ? ret : im;
 }
 
-/**
- * Read from touch IC: first write register address, then read data.
- * buf[0..1] = 16-bit register address, buf[2..len-1] = read buffer.
- */
 static int32_t GTP_I2C_Read(uint8_t client_addr, uint8_t *buf, int32_t len)
 {
     struct i2c_msg msgs[2];
-    int32_t ret = -1;
-    int32_t retries = 0;
-
-    msgs[0].flags = 0;                               /* Write register address */
-    msgs[0].addr  = client_addr;
-    msgs[0].len   = GTP_ADDR_LENGTH;
-    msgs[0].buf   = &buf[0];
-
-    msgs[1].flags = I2C_M_RD;                         /* Read data */
-    msgs[1].addr  = client_addr;
-    msgs[1].len   = len - GTP_ADDR_LENGTH;
-    msgs[1].buf   = &buf[GTP_ADDR_LENGTH];
-
-    while (retries < 5) {
-        ret = I2C_Transfer(msgs, 2);
-        if (ret == 2) break;
-        retries++;
-    }
+    int32_t ret = -1, retries = 0;
+    msgs[0].flags = 0; msgs[0].addr = client_addr;
+    msgs[0].len = GTP_ADDR_LENGTH; msgs[0].buf = &buf[0];
+    msgs[1].flags = I2C_M_RD; msgs[1].addr = client_addr;
+    msgs[1].len = len - GTP_ADDR_LENGTH; msgs[1].buf = &buf[GTP_ADDR_LENGTH];
+    while (retries < 5) { ret = I2C_Transfer(msgs, 2); if (ret == 2) break; retries++; }
     return ret;
 }
 
-/**
- * Write to touch IC: register address + data.
- */
 static int32_t GTP_I2C_Write(uint8_t client_addr, uint8_t *buf, int32_t len)
 {
     struct i2c_msg msg;
-
-    msg.flags = 0;
-    msg.addr  = client_addr;
-    msg.len   = len;
-    msg.buf   = buf;
-
+    msg.flags = 0; msg.addr = client_addr; msg.len = len; msg.buf = buf;
     return I2C_Transfer(&msg, 1);
 }
 
 /*===========================================================================
- * I2C communication test
+ * I2C comm test
  *===========================================================================*/
 
 static int8_t GTP_I2C_Test(void)
 {
-    uint8_t retry = 0;
-    uint8_t ret;
+    uint8_t retry = 0, ret;
     uint8_t test_buf[3] = { GTP_REG_CONFIG_DATA >> 8, GTP_REG_CONFIG_DATA & 0xFF, 0 };
-
     while (retry < 5) {
         ret = GTP_I2C_Read(GTP_ADDRESS, test_buf, 2 + 1);
-        if (ret > 0) {
-            GTP_INFO("I2C test OK");
-            return 0;
-        }
+        if (ret > 0) { GTP_INFO("I2C test OK"); return 0; }
         GTP_ERROR("I2C test retry %d", retry);
-        retry++;
-        CPU_TS_Tmr_Delay_US(10000);  /* 10 ms */
+        retry++; CPU_TS_Tmr_Delay_US(10000);
     }
     return -1;
 }
 
 /*===========================================================================
- * Chip version detection
+ * Read version
  *===========================================================================*/
 
 int32_t GTP_Read_Version(void)
 {
     int32_t ret;
     uint8_t buf[8] = { GTP_REG_VERSION >> 8, GTP_REG_VERSION & 0xff };
-
     ret = GTP_I2C_Read(GTP_ADDRESS, buf, sizeof(buf));
-    if (ret < 0) {
-        GTP_ERROR("Read version failed");
-        return ret;
-    }
-
+    if (ret < 0) { GTP_ERROR("Read version failed"); return ret; }
     GTP_INFO("Chip ID: %02X%02X%02X%02X, FW: %02X%02X",
              buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
     return 2;
@@ -142,103 +100,124 @@ static void GTP_IRQ_Enable(void)
 }
 
 /*===========================================================================
- * Panel initialization
+ * Init
  *===========================================================================*/
 
 int32_t GTP_Init_Panel(void)
 {
     int32_t ret;
-
     GPT_I2C_Touch_Init();
-
     ret = GTP_I2C_Test();
-    if (ret < 0) {
-        GTP_ERROR("I2C communication ERROR!");
-        return ret;
-    }
-
+    if (ret < 0) { GTP_ERROR("I2C communication ERROR!"); return ret; }
     GTP_Read_Version();
 
-    /* Soft reset + set normal operating mode */
+    /* Soft reset + normal mode */
     {
         uint8_t cmd[3] = { 0x80, 0x40, 0x02 };
         GTP_I2C_Write(GTP_ADDRESS, cmd, 3);
         CPU_TS_Tmr_Delay_US(50000);
-        cmd[2] = 0x00;  /* Read coordinates mode */
+        cmd[2] = 0x00;
         GTP_I2C_Write(GTP_ADDRESS, cmd, 3);
         CPU_TS_Tmr_Delay_US(10000);
     }
 
     GTP_IRQ_Enable();
     GTP_INFO("GT1151QM init OK (800x480)");
-    /* NOTE: If touch doesn't detect, check flex cable connection.
-     *       The chip communicates fine (I2C OK, config valid 800x480)
-     *       but touch sensor may need hardware verification. */
-
     return 0;
 }
 
 /*===========================================================================
- * Touch coordinate reading
+ * Touch state globals (updated by Goodix_TS_Work_Func)
  *===========================================================================*/
 
-/**
- * Read single-touch coordinates from GT1151QM.
- *
- * @param x  [out] Touch X coordinate (0..799)
- * @param y  [out] Touch Y coordinate (0..479)
- * @return   1 if touch detected, 0 if no touch
- *
- * Register layout (from 0x814E):
- *   [0..1]  register address (set by GTP_I2C_Read)
- *   [2]     status: bit7=buffer ready, bits3-0=touch count
- *   [3]     track ID
- *   [4..5]  X coord (little-endian)
- *   [6..7]  Y coord (little-endian)
- *   [8..9]  touch size
- */
-int GTP_Execu(int *x, int *y)
+static int g_tp_x = 0, g_tp_y = 0, g_tp_down = 0;
+
+static void GTP_Touch_Down(int32_t id, int32_t x, int32_t y, int32_t w)
 {
-    uint8_t  point_data[2 + 1 + 8 + 1] = { GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF };
-    uint8_t  touch_num;
-    uint8_t  finger;
-    int32_t  input_x = 0;
-    int32_t  input_y = 0;
-    int32_t  ret;
+    (void)id; (void)w;
+    g_tp_x = x; g_tp_y = y; g_tp_down = 1;
+}
+
+static void GTP_Touch_Up(int32_t id)
+{
+    (void)id;
+    g_tp_down = 0;
+}
+
+/*===========================================================================
+ * Goodix_TS_Work_Func — verified working in TLI_LCD_TOUCH reference
+ *===========================================================================*/
+
+static void Goodix_TS_Work_Func(void)
+{
+    uint8_t  end_cmd[3] = {GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF, 0};
+    uint8_t  point_data[2 + 1 + 8 * GTP_MAX_TOUCH + 1] = {GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF};
+    uint8_t  touch_num = 0, finger = 0;
+    static uint16_t pre_touch = 0;
+    static uint8_t  pre_id[GTP_MAX_TOUCH] = {0};
+    uint8_t *coor_data = NULL;
+    int32_t  input_x = 0, input_y = 0, input_w = 0;
+    uint8_t  id = 0;
+    int32_t  i = 0, ret = -1;
+
     ret = GTP_I2C_Read(GTP_ADDRESS, point_data, 12);
-    if (ret < 0) {
-        return 0;
-    }
+    if (ret < 0) return;
 
-    finger = point_data[GTP_ADDR_LENGTH];  /* Status register */
-
-    if (finger == 0x00) {
-        return 0;  /* No touch data */
-    }
-
-    if ((finger & 0x80) == 0) {
-        return 0;  /* Buffer not ready */
-    }
+    finger = point_data[GTP_ADDR_LENGTH];
+    if (finger == 0x00) return;
+    if ((finger & 0x80) == 0) goto exit_work_func;
 
     touch_num = finger & 0x0f;
-    if (touch_num > GTP_MAX_TOUCH || touch_num == 0) {
-        return 0;
+    if (touch_num > GTP_MAX_TOUCH) goto exit_work_func;
+
+    if (touch_num > 1) {
+        uint8_t buf[8 * GTP_MAX_TOUCH] = {(GTP_READ_COOR_ADDR + 10) >> 8, (GTP_READ_COOR_ADDR + 10) & 0xff};
+        ret = GTP_I2C_Read(GTP_ADDRESS, buf, 2 + 8 * (touch_num - 1));
+        memcpy(&point_data[12], &buf[2], 8 * (touch_num - 1));
     }
 
-    input_x = point_data[3 + 1] | (point_data[3 + 2] << 8);
-    input_y = point_data[3 + 3] | (point_data[3 + 4] << 8);
-
-    /* Clear touch buffer after read (required by GT1151QM protocol) */
-    {
-        uint8_t end_cmd[3] = { GTP_READ_COOR_ADDR >> 8, GTP_READ_COOR_ADDR & 0xFF, 0 };
-        GTP_I2C_Write(GTP_ADDRESS, end_cmd, 3);
+    if (pre_touch > touch_num) {
+        for (i = 0; i < pre_touch; i++) {
+            uint8_t j;
+            for (j = 0; j < touch_num; j++) {
+                coor_data = &point_data[j * 8 + 3];
+                id = coor_data[0] & 0x0F;
+                if (pre_id[i] == id) break;
+                if (j >= touch_num - 1) GTP_Touch_Up(pre_id[i]);
+            }
+        }
     }
 
-    if (input_x < GTP_MAX_WIDTH && input_y < GTP_MAX_HEIGHT) {
-        *x = input_x;
-        *y = input_y;
+    if (touch_num) {
+        for (i = 0; i < touch_num; i++) {
+            coor_data = &point_data[i * 8 + 3];
+            id = coor_data[0] & 0x0F;
+            pre_id[i] = id;
+            input_x = coor_data[1] | (coor_data[2] << 8);
+            input_y = coor_data[3] | (coor_data[4] << 8);
+            input_w = coor_data[5] | (coor_data[6] << 8);
+            GTP_Touch_Down(id, input_x, input_y, input_w);
+        }
+    } else if (pre_touch) {
+        for (i = 0; i < pre_touch; i++) GTP_Touch_Up(pre_id[i]);
+    }
+    pre_touch = touch_num;
+
+exit_work_func:
+    GTP_I2C_Write(GTP_ADDRESS, end_cmd, 3);
+}
+
+/*===========================================================================
+ * GTP_Execu — single-touch API for emWin
+ *===========================================================================*/
+
+int GTP_Execu(int *x, int *y)
+{
+    Goodix_TS_Work_Func();
+    if (g_tp_down) {
+        *x = g_tp_x;
+        *y = g_tp_y;
         return 1;
     }
-
     return 0;
 }
