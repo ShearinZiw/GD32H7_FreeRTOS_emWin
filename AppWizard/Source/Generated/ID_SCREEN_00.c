@@ -248,19 +248,17 @@ static APPW_CREATE_ITEM _aCreate[] = {
     },
     { 0, 0 }
   },
-#if 0  /* DEBUG: IMAGE needs file system (.dta file) — disabled */
   { WM_OBJECT_IMAGE_Create,
     ID_IMAGE_00, ID_SCREEN_00,
-    { { { DISPOSE_MODE_REL_PARENT, 533, 0, 0 },
-        { DISPOSE_MODE_REL_PARENT, 179, 0, 0 },
+    { { { DISPOSE_MODE_REL_PARENT, 122, 0, 0 },
+        { DISPOSE_MODE_REL_PARENT, -1, 0, 0 },
         { DISPOSE_MODE_NULL, 0, 0, 0 },
         { DISPOSE_MODE_NULL, 0, 0, 0 },
       },
-      267, 229, 0, 0, 0, 0
+      480, 480, 0, 0, 0, 0
     },
     { 0, 0 }
   },
-#endif
 };
 
 /*********************************************************************
@@ -270,13 +268,6 @@ static APPW_CREATE_ITEM _aCreate[] = {
 static GUI_CONST_STORAGE APPW_SETUP_ITEM _aSetup[] = {
   { ID_BOX_00,         APPW_SET_PROP_COLOR,        { ARG_V(GUI_WHITE) } },
   { ID_TEXT_00,        APPW_SET_PROP_COLOR,        { ARG_V(0xff00aa00) } },
-  { ID_TEXT_00,        APPW_SET_PROP_ALIGNTEXT,    { ARG_V(GUI_ALIGN_HCENTER | GUI_ALIGN_VCENTER),
-                                                     ARG_V(0),
-                                                     ARG_V(0) } },
-  { ID_TEXT_00,        APPW_SET_PROP_TEXTID,       { ARG_V(ID_RTEXT_0) } },
-  { ID_TEXT_00,        APPW_SET_PROP_FONT,         { ARG_VPF(0, acNettoOT_40_Normal_EXT_AA4, &APPW__aFont[0]) } },
-  { ID_TEXT_00,        APPW_SET_PROP_BKCOLOR,      { ARG_V(GUI_INVALID_COLOR) } },
-  { ID_TEXT_00_Copy,   APPW_SET_PROP_COLOR,        { ARG_V(GUI_YELLOW) } },
   { ID_TEXT_00,        APPW_SET_PROP_ALIGNTEXT,    { ARG_V(GUI_ALIGN_HCENTER | GUI_ALIGN_VCENTER),
                                                      ARG_V(0),
                                                      ARG_V(0) } },
@@ -400,7 +391,7 @@ static GUI_CONST_STORAGE APPW_SETUP_ITEM _aSetup[] = {
   { ID_BUTTON_00,      APPW_SET_PROP_COLORS,       { ARG_V(0xffc0c0c0),
                                                      ARG_V(0xffc0c0c0),
                                                      ARG_V(GUI_INVALID_COLOR) } },
-#if 0  /* DEBUG: IMAGE needs file system — disabled */
+#if 0  /* IMAGE needs file system — disabled */
   { ID_IMAGE_00,       APPW_SET_PROP_TILE,         { ARG_V(0) } },
   { ID_IMAGE_00,       APPW_SET_PROP_SBITMAP,      { ARG_VP(1, "DARK_Image_DiagLinesGray_40x40.dta"),
                                                      ARG_V(170), } },
@@ -417,6 +408,14 @@ static GUI_CONST_STORAGE APPW_ACTION_ITEM _aAction[] = {
       ARG_V(0),
     }, 0, NULL
   },
+#if 0  /* IMAGE disabled — skip bitmap action */
+  { ID_BUTTON_00,      WM_NOTIFICATION_SET,              ID_IMAGE_00,       APPW_JOB_SETBITMAP,      ID_SCREEN_00__ID_BUTTON_00__WM_NOTIFICATION_SET__ID_IMAGE_00__APPW_JOB_SETBITMAP,
+    { ARG_V(0),
+      ARG_VP(1, "test.dta"),
+      ARG_V(25439),
+    }, 0, NULL
+  },
+#endif
 };
 
 /*********************************************************************

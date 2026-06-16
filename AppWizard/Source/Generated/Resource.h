@@ -60,7 +60,7 @@ extern APPW_ROOT_INFO ID_SCREEN_00_RootInfo;
 *
 *       Project path
 */
-#define APPW_PROJECT_PATH "/"  /* non-empty path required; resources are compiled-in on embedded */
+#define APPW_PROJECT_PATH "/"  /* Non-empty path required; resources are compiled-in */
 
 #endif  // RESOURCE_H
 

@@ -9,8 +9,10 @@
 #define __GUI_DEMO_H
 
 #include "GUI.h"
+#include "IMAGE.h"
 
 void GUI_Demo_JPEG(const char *path, int x, int y);
+void GUI_Demo_JPEG_Image(const char *path, IMAGE_Handle hImage);
 void GUI_Demo_GIF(const char *path, int x, int y);
 void GUI_Demo_BMP(const char *path, int x, int y);
 void GUI_Demo_MOVIE(const char *path, int x, int y, int w, int h);

@@ -52,6 +52,12 @@ void GUI_Demo_JPEG(const char *path, int x, int y)
     if (size) GUI_JPEG_Draw(_demo_buf, size, x, y);
 }
 
+void GUI_Demo_JPEG_Image(const char *path, IMAGE_Handle hImage)
+{
+    U32 size = _LoadFile(path);
+    if (size && hImage) IMAGE_SetJPEG(hImage, _demo_buf, size);
+}
+
 /*===========================================================================
  * GUI_Demo_GIF — load and display GIF from SD card
  *===========================================================================*/

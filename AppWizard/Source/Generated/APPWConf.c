@@ -43,7 +43,7 @@ Purpose     : Generated file do NOT edit!
 *
 *       Multibuffering
 */
-static U8 _MultibufEnable = 0;  /* 0 for embedded single-buffer TLI (GUIDRV_LIN_16) */
+static U8 _MultibufEnable = 1;
 
 /*********************************************************************
 *
@@ -134,11 +134,6 @@ void APPW_X_Config(void) {
     LCD_SetSizeEx (0, XSIZE_PHYS, YSIZE_PHYS);
     LCD_SetVSizeEx(0, XSIZE_PHYS, YSIZE_PHYS);
   }
-}
-#else /* embedded target: LCDConf.c already created GUIDRV_LIN_16 device */
-void APPW_X_Config(void) {
-  LCD_SetSizeEx (0, XSIZE_PHYS, YSIZE_PHYS);
-  LCD_SetVSizeEx(0, XSIZE_PHYS, YSIZE_PHYS);
 }
 #endif
 

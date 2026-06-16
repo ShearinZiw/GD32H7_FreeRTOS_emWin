@@ -776,16 +776,16 @@
       IdPrev=0
       IdPost=0
       <Dispose>
-        xSize=267
-        ySize=229
+        xSize=480
+        ySize=480
         <X0>
           Mode=2
-          Off=533
+          Off=122
           Id=0
         </X0>
         <Y0>
           Mode=2
-          Off=179
+          Off=-1
           Id=0
         </Y0>
       </Dispose>
@@ -809,6 +809,18 @@
         Index=0
       </Para>
     </SETCOLOR>
+    <SETBITMAP>
+      RootId=6144
+      IdSrc=ID_BUTTON_00
+      NCode=WM_NOTIFICATION_SET
+      IdDst=ID_IMAGE_00
+      Slot=ID_SCREEN_00__ID_BUTTON_00__WM_NOTIFICATION_SET__ID_IMAGE_00__APPW_JOB_SETBITMAP
+      Flags=0
+      <Para>
+        Index=0
+        Image=test.jpg
+      </Para>
+    </SETBITMAP>
   </Interactions>
   <Selection>
     Root=ID_SCREEN_00
