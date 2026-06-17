@@ -29,6 +29,13 @@ Purpose     : AppWizard managed file, function content could be changed
 
 /*** Begin of user code area ***/
 
+#ifndef WIN32
+extern const void * IP_FS_Open(const char * sPath, U32 * pSize);
+extern void         IP_FS_Close(const void * pHandle);
+extern int          IP_FS_Read(void * pBuffer, int ElementSize, int NumElements, const void * pHandle);
+extern int          IP_FS_Seek(const void * pHandle, U32 Off);
+#endif
+
 typedef struct {
   int Id;
   int x;
@@ -97,8 +104,16 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
 };
 
 static const HMI_LANGUAGE _aLanguage[] = {
-  { "GUX vehicle terminal", "Navigation", "Audio", "Video", "Vehicle",  "Phone",   "Settings", "Off" },
-  { "GUX Fahrzeugterminal", "Navigation", "Audio", "Medien", "Fahrzeug", "Telefon", "Setup",    "Aus" }
+  { "GUX vehicle terminal", "Navigation", "Audio", "Video",  "Vehicle",  "Phone",   "Settings", "Calendar" },
+  { "GUX Fahrzeugterminal", "Navigation", "Audio", "Medien", "Fahrzeug", "Telefon", "Setup",    "Kalender" },
+  { "GUX vehicle terminal",
+    "\xE5\xAF\xBC\xE8\x88\xAA",
+    "\xE9\x9F\xB3\xE9\xA2\x91",
+    "\xE8\xA7\x86\xE9\xA2\x91",
+    "\xE8\xBD\xA6\xE8\xBE\x86",
+    "\xE7\x94\xB5\xE8\xAF\x9D",
+    "\xE8\xAE\xBE\xE7\xBD\xAE",
+    "\xE6\x97\xA5\xE5\x8E\x86" }
 };
 
 static const HMI_NAV_ITEM _aNavItem[] = {
@@ -108,17 +123,17 @@ static const HMI_NAV_ITEM _aNavItem[] = {
   { HMI_PAGE_VEHICLE,    348, 452, "VEHICLE" },
   { HMI_PAGE_PHONE,      458, 562, "PHONE" },
   { HMI_PAGE_SETTINGS,   568, 672, "SETTINGS" },
-  { HMI_PAGE_OFF,        678, 782, "OFF" }
+  { HMI_PAGE_OFF,        678, 782, "CAL" }
 };
 
 static const HMI_PAGE_TEXT _aPageText[] = {
   { "NAV",     "Route guidance",  "Destination", "HOME",     "45 km",   "Next: Main St", "ETA 13:08" },
-  { "AUDIO",   "Bluetooth Music", "Now Playing", "GD32 Drive","Vol 62%", "Bass +2",       "Source: BT" },
+  { "AUDIO",   "Buzzer Music",    "Now Playing", "DI-DI-DI",  "Vol 62%", "Tap center",    "KEY1 - KEY2 +" },
   { "VIDEO",   "SD Media Center", "Media",       "JPEG",     "GIF/BMP", "Movie ready",   "Use MEDIA=..." },
-  { "10:32",   "Wednesday, May 27","All Systems", "READY",    "000 km/h","Volume 62%",    "ADC 0x000" },
-  { "PHONE",   "Hands-free",      "Connected",   "NO CALL",  "4G",      "Contacts ready","Last: Alice" },
-  { "SET",     "System Settings", "Display",     "AUTO",     "Vol 62%", "Speed ADC",     "PERF ON/OFF" },
-  { "OFF",     "Standby Mode",    "Terminal",    "SLEEP",    "--",      "Tap any menu",  "Buzzer armed" }
+  { "10:32",   "Wednesday, May 27","All Systems", "READY",    "75 F",    "Partly Cloudy", "000 km/h" },
+  { "",        "Enter number",    "",            "NO CALL",  "",        "",              "" },
+  { "",        "",                "",            "EN",       "",        "",              "" },
+  { "",        "",                "",            "",         "",        "",              "" }
 };
 
 static int _ScreenReady;
@@ -135,6 +150,7 @@ static char _acRange[40];
 static char _acPerf0[48];
 static char _acPerf1[48];
 static char _acPerf2[48];
+static char _acPhoneNumber[24];
 static WM_HWIN _hScreen;
 static int _PerfEnabled;
 static unsigned _PaintCount;
@@ -142,9 +158,17 @@ static unsigned _PerfLoopCount;
 static unsigned _LastPerfLoopCount;
 static GUI_TIMER_TIME _LastPerfTime;
 static HMI_PAGE _ActivePage = HMI_PAGE_VEHICLE;
+static unsigned _ActiveLang;
 static unsigned _VolumePercent = 62U;
 static unsigned _SpeedKmh;
 static unsigned _SpeedAdcRaw;
+#ifndef WIN32
+static GUI_FONT _FontZh24;
+static GUI_XBF_DATA _FontZh24Data;
+static const void * _hZhFontFile;
+static U32 _ZhFontSize;
+static int _ZhFontReady;
+#endif
 #ifndef WIN32
 static int _LastTouchPressed;
 static GUI_TIMER_TIME _LastInputTime;
@@ -156,6 +180,9 @@ static int _ShowMediaMovie(int Report);
 static void _HideMedia(void);
 static void _SelectPage(HMI_PAGE Page, int Report);
 static void _RefreshControlTelemetry(void);
+static void _RefreshPhonePage(void);
+static const char * _GetLangCode(unsigned Lang);
+static int _ApplyLanguage(unsigned Lang, int Report);
 
 static void _SetWidgetText(int Id, const char * pText) {
   WM_HWIN hItem;
@@ -194,6 +221,98 @@ static const char * _GetPageName(HMI_PAGE Page) {
   }
   return "UNKNOWN";
 }
+
+static const char * _GetNavLabel(HMI_PAGE Page) {
+  const HMI_LANGUAGE * pLang;
+
+  pLang = &_aLanguage[_ActiveLang];
+  switch (Page) {
+  case HMI_PAGE_NAVIGATION:
+    return pLang->pNav;
+  case HMI_PAGE_AUDIO:
+    return pLang->pAudio;
+  case HMI_PAGE_VIDEO:
+    return pLang->pVideo;
+  case HMI_PAGE_VEHICLE:
+    return pLang->pVehicle;
+  case HMI_PAGE_PHONE:
+    return pLang->pPhone;
+  case HMI_PAGE_SETTINGS:
+    return pLang->pSettings;
+  case HMI_PAGE_OFF:
+    return pLang->pOff;
+  default:
+    return "";
+  }
+}
+
+static const char * _GetLangCode(unsigned Lang) {
+  switch (Lang) {
+  case 1:
+    return "DE";
+  case 2:
+    return "CN";
+  default:
+    return "EN";
+  }
+}
+
+#ifndef WIN32
+static int _cbGetZhFontData(U32 Off, U16 NumBytes, void * pVoid, void * pBuffer) {
+  const void * hFile;
+
+  hFile = (const void *)pVoid;
+  if ((hFile == NULL) || (pBuffer == NULL)) {
+    return 1;
+  }
+  if (IP_FS_Seek(hFile, Off) != 0) {
+    return 1;
+  }
+  return (IP_FS_Read(pBuffer, 1, NumBytes, hFile) == NumBytes) ? 0 : 1;
+}
+
+static int _EnsureChineseFont(int Report) {
+  int Result;
+
+  if (_ZhFontReady) {
+    return 1;
+  }
+  if (_hZhFontFile == NULL) {
+    _hZhFontFile = IP_FS_Open("0:/font.xbf", &_ZhFontSize);
+    if (_hZhFontFile == NULL) {
+      if (Report) {
+        printf("[VehicleUI] LANG=CN failed: missing 0:/font.xbf\r\n");
+      }
+      return 0;
+    }
+  }
+  _FontZh24Data.pVoid = (void *)_hZhFontFile;
+  _FontZh24Data.pfGetData = _cbGetZhFontData;
+  Result = GUI_XBF_CreateFont(&_FontZh24, &_FontZh24Data,
+                              GUI_XBF_TYPE_PROP_AA4_EXT,
+                              _cbGetZhFontData,
+                              (void *)_hZhFontFile);
+  if (Result != 0) {
+    IP_FS_Close(_hZhFontFile);
+    _hZhFontFile = NULL;
+    _ZhFontSize = 0;
+    if (Report) {
+      printf("[VehicleUI] LANG=CN failed: invalid XBF font (err=%d)\r\n", Result);
+    }
+    return 0;
+  }
+  _ZhFontReady = 1;
+  if (Report) {
+    printf("[VehicleUI] Loaded Chinese font: 0:/font.xbf (%lu bytes)\r\n", (unsigned long)_ZhFontSize);
+  }
+  return 1;
+}
+#else
+static int _EnsureChineseFont(int Report) {
+  GUI_USE_PARA(Report);
+  return 0;
+}
+#endif
 
 static int _GetBottomPageAt(int x, int y, HMI_PAGE * pPage) {
   unsigned i;
@@ -299,12 +418,17 @@ static void _SetPerfEnabled(int Enabled, int Report) {
   }
 }
 
-static void _ApplyLanguage(unsigned Lang) {
+static int _ApplyLanguage(unsigned Lang, int Report) {
   const HMI_LANGUAGE * pLang;
 
   if (Lang >= GUI_COUNTOF(_aLanguage)) {
-    return;
+    return 0;
   }
+  if ((Lang == 2U) && (_EnsureChineseFont(Report) == 0)) {
+    _SetWidgetText(ID_TEXT_00_Copy3, "CN FONT ERR");
+    return 0;
+  }
+  _ActiveLang = Lang;
   pLang = &_aLanguage[Lang];
   _SetWidgetText(ID_TEXT_00_Copy1,  pLang->pTitle);
   _SetWidgetText(ID_TEXT_00_Copy8,  pLang->pNav);
@@ -314,9 +438,16 @@ static void _ApplyLanguage(unsigned Lang) {
   _SetWidgetText(ID_TEXT_00_Copy11, pLang->pPhone);
   _SetWidgetText(ID_TEXT_00_Copy12, pLang->pSettings);
   _SetWidgetText(ID_TEXT_00_Copy13, pLang->pOff);
+  if (_ActivePage == HMI_PAGE_SETTINGS) {
+    _SetWidgetText(ID_TEXT_00_Copy3, _GetLangCode(Lang));
+  }
   if (_hScreen) {
     WM_InvalidateWindow(_hScreen);
   }
+  if (Report) {
+    printf("[VehicleUI] Applied LANG=%s\r\n", _GetLangCode(Lang));
+  }
+  return 1;
 }
 
 static void _SetWidgetPos(WM_HWIN hScreen, int Id, int x, int y, int w, int h) {
@@ -453,13 +584,129 @@ static void _DrawNavItem(int x0, int x1, int Selected) {
 }
 
 static void _DrawBottomBar(void) {
-  int x;
-  int i;
+  GUI_RECT Rect;
+  unsigned i;
 
   GUI_SetColor(0xdd101820);
   GUI_FillRect(0, 404, 799, 479);
-  for (i = 0, x = 18; i < 7; i++, x += 110) {
-    _DrawNavItem(x, x + 104, i == (int)_ActivePage);
+  GUI_SetTextMode(GUI_TM_TRANS);
+#ifndef WIN32
+  if ((_ActiveLang == 2U) && _ZhFontReady) {
+    GUI_SetFont(&_FontZh24);
+  } else
+#endif
+  GUI_SetFont(GUI_FONT_16B_ASCII);
+  for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
+    _DrawNavItem(_aNavItem[i].x0, _aNavItem[i].x1, _aNavItem[i].Page == _ActivePage);
+    Rect.x0 = _aNavItem[i].x0 + 2;
+    Rect.y0 = 438;
+    Rect.x1 = _aNavItem[i].x1 - 2;
+    Rect.y1 = 466;
+    GUI_SetColor(0xfff4f8fc);
+    GUI_DispStringInRect((char *)_GetNavLabel(_aNavItem[i].Page), &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+  }
+}
+
+static void _DrawPhoneKeypad(void) {
+  static const char * aLabels[12] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "DEL" };
+  GUI_RECT Rect;
+  int Row;
+  int Col;
+  int Index;
+  int x;
+  int y;
+
+  GUI_SetFont(GUI_FONT_20B_ASCII);
+  GUI_SetTextMode(GUI_TM_TRANS);
+  for (Row = 0; Row < 4; Row++) {
+    for (Col = 0; Col < 3; Col++) {
+      Index = Row * 3 + Col;
+      x = 286 + Col * 76;
+      y = 140 + Row * 48;
+      GUI_DrawGradientRoundedV(x, y, x + 64, y + 38, 6, 0xffeef3f7, 0xffaab7c2);
+      GUI_SetColor(0xff2b333d);
+      GUI_DrawRoundedRect(x, y, x + 64, y + 38, 6);
+      Rect.x0 = x;
+      Rect.y0 = y;
+      Rect.x1 = x + 64;
+      Rect.y1 = y + 38;
+      GUI_SetColor(0xff16202a);
+      GUI_DispStringInRect((char *)aLabels[Index], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+    }
+  }
+}
+
+static void _DrawSettingsLanguage(void) {
+  GUI_RECT Rect;
+  const char * aLang[] = { "EN", "DE", "CN" };
+  int i;
+  int x;
+
+  GUI_SetTextMode(GUI_TM_TRANS);
+  GUI_SetFont(GUI_FONT_20B_ASCII);
+  for (i = 0; i < 3; i++) {
+    x = 290 + i * 78;
+    if ((unsigned)i == _ActiveLang) {
+      GUI_DrawGradientRoundedV(x, 148, x + 64, 196, 8, 0xff00b4e8, 0xff008ec2);
+    } else {
+      GUI_DrawGradientRoundedV(x, 148, x + 64, 196, 8, 0xffeef3f7, 0xffaab7c2);
+    }
+    GUI_SetColor(0xff26313b);
+    GUI_DrawRoundedRect(x, 148, x + 64, 196, 8);
+    Rect.x0 = x;
+    Rect.y0 = 148;
+    Rect.x1 = x + 64;
+    Rect.y1 = 196;
+    GUI_SetColor((unsigned)i == _ActiveLang ? 0xffffffff : 0xff16202a);
+    GUI_DispStringInRect((char *)aLang[i], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+  }
+  GUI_SetFont(GUI_FONT_16_ASCII);
+  GUI_SetColor(0xffcfd8e4);
+  GUI_DispStringAt("CN font: N/A", 350, 226);
+}
+
+static void _DrawCalendarMonth(void) {
+  static const char * aWeek[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+  GUI_RECT Rect;
+  char acDay[4];
+  int i;
+  int Day;
+  int Row;
+  int Col;
+  int x;
+  int y;
+
+  GUI_SetTextMode(GUI_TM_TRANS);
+  GUI_SetFont(GUI_FONT_16B_ASCII);
+  GUI_SetColor(0xfff4f8fc);
+  GUI_DispStringAt("June 2026", 348, 106);
+  for (i = 0; i < 7; i++) {
+    Rect.x0 = 230 + i * 50;
+    Rect.y0 = 132;
+    Rect.x1 = Rect.x0 + 46;
+    Rect.y1 = 154;
+    GUI_SetColor(0xff9fc7d8);
+    GUI_DispStringInRect((char *)aWeek[i], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+  }
+  for (Day = 1; Day <= 30; Day++) {
+    Row = (Day) / 7;
+    Col = (Day) % 7;
+    x = 230 + Col * 50;
+    y = 162 + Row * 38;
+    if (Day == 17) {
+      GUI_DrawGradientRoundedV(x + 4, y, x + 42, y + 30, 5, 0xff00b4e8, 0xff008ec2);
+      GUI_SetColor(0xffffffff);
+    } else {
+      GUI_SetColor(0x3316202a);
+      GUI_FillRoundedRect(x + 4, y, x + 42, y + 30, 5);
+      GUI_SetColor(0xffedf3fa);
+    }
+    Rect.x0 = x + 4;
+    Rect.y0 = y;
+    Rect.x1 = x + 42;
+    Rect.y1 = y + 30;
+    snprintf(acDay, sizeof(acDay), "%d", Day);
+    GUI_DispStringInRect(acDay, &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
   }
 }
 
@@ -492,28 +739,23 @@ static void _DrawFeaturePanel(void) {
     GUI_DrawLine(522, 164, 522, 270);
     GUI_FillCircle(442, 292, 18);
     GUI_FillCircle(508, 270, 18);
+    GUI_SetFont(GUI_FONT_16B_ASCII);
+    GUI_SetTextMode(GUI_TM_TRANS);
+    GUI_SetColor(0xffcfd8e4);
+    GUI_DispStringAt("Tap panel to play", 340, 324);
     break;
   case HMI_PAGE_VIDEO:
     GUI_DrawRoundedRect(280, 132, 520, 302, 10);
     GUI_FillPolygon(play, GUI_COUNTOF(play), 0, 0);
     break;
   case HMI_PAGE_PHONE:
-    GUI_DrawArc(400, 224, 78, 78, 210, 330);
-    GUI_FillRoundedRect(324, 282, 382, 328, 12);
-    GUI_FillRoundedRect(418, 282, 476, 328, 12);
-    GUI_DrawLine(354, 282, 446, 282);
+    _DrawPhoneKeypad();
     break;
   case HMI_PAGE_SETTINGS:
-    GUI_DrawLine(318, 164, 514, 164);
-    GUI_DrawLine(318, 224, 514, 224);
-    GUI_DrawLine(318, 284, 514, 284);
-    GUI_FillCircle(384, 164, 14);
-    GUI_FillCircle(456, 224, 14);
-    GUI_FillCircle(360, 284, 14);
+    _DrawSettingsLanguage();
     break;
   case HMI_PAGE_OFF:
-    GUI_DrawCircle(400, 214, 72);
-    GUI_DrawLine(400, 126, 400, 210);
+    _DrawCalendarMonth();
     break;
   case HMI_PAGE_VEHICLE:
   default:
@@ -570,6 +812,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
   }
   _ScreenReady = 1;
   _hScreen = hScreen;
+  GUI_UC_SetEncodeUTF8();
 
   hBox = WM_GetDialogItem(hScreen, ID_BOX_00);
   if (hBox) {
@@ -591,14 +834,21 @@ static void _InitDashboard(WM_HWIN hScreen) {
 
   _SetWidgetPos(hScreen, ID_BUTTON_00, 238, 418, 106, 56);
   _SetWidgetText(ID_BUTTON_00, "Video");
+  _SetWidgetVisible(ID_TEXT_00_Copy8, 0);
+  _SetWidgetVisible(ID_TEXT_00_Copy9, 0);
+  _SetWidgetVisible(ID_BUTTON_00, 0);
+  _SetWidgetVisible(ID_TEXT_00_Copy10, 0);
+  _SetWidgetVisible(ID_TEXT_00_Copy11, 0);
+  _SetWidgetVisible(ID_TEXT_00_Copy12, 0);
+  _SetWidgetVisible(ID_TEXT_00_Copy13, 0);
 
   _CopyText(_acTime,    sizeof(_acTime),    "10:32");
   _CopyText(_acDate,    sizeof(_acDate),    "Wednesday, May 27");
   _CopyText(_acSystem,  sizeof(_acSystem),  "All Systems");
   _CopyText(_acStatus,  sizeof(_acStatus),  "READY");
-  _CopyText(_acTemp,    sizeof(_acTemp),    "000 km/h");
-  _CopyText(_acWeather, sizeof(_acWeather), "Volume 62%");
-  _CopyText(_acRange,   sizeof(_acRange),   "ADC 0x000");
+  _CopyText(_acTemp,    sizeof(_acTemp),    "75 F");
+  _CopyText(_acWeather, sizeof(_acWeather), "Partly Cloudy");
+  _CopyText(_acRange,   sizeof(_acRange),   "000 km/h");
 
   _SetPerfVisible(0);
   _RefreshControlTelemetry();
@@ -634,11 +884,7 @@ static void _SetTemperature(const char * pValue) {
 
 static void _RefreshControlTelemetry(void) {
   if (_ActivePage == HMI_PAGE_VEHICLE) {
-    snprintf(_acTemp, sizeof(_acTemp), "%03u km/h", _SpeedKmh);
-    snprintf(_acWeather, sizeof(_acWeather), "Volume %u%%", _VolumePercent);
-    snprintf(_acRange, sizeof(_acRange), "ADC 0x%03X", _SpeedAdcRaw);
-    _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
-    _SetWidgetText(ID_TEXT_00_Copy5, _acWeather);
+    snprintf(_acRange, sizeof(_acRange), "%03u km/h", _SpeedKmh);
     _SetWidgetText(ID_TEXT_00_Copy6, _acRange);
   } else if (_ActivePage == HMI_PAGE_AUDIO) {
     snprintf(_acTemp, sizeof(_acTemp), "Vol %u%%", _VolumePercent);
@@ -648,7 +894,7 @@ static void _RefreshControlTelemetry(void) {
   } else if (_ActivePage == HMI_PAGE_SETTINGS) {
     snprintf(_acTemp, sizeof(_acTemp), "Vol %u%%", _VolumePercent);
     snprintf(_acWeather, sizeof(_acWeather), "Speed %u km/h", _SpeedKmh);
-    snprintf(_acRange, sizeof(_acRange), "ADC 0x%03X", _SpeedAdcRaw);
+    snprintf(_acRange, sizeof(_acRange), "%03u km/h", _SpeedKmh);
     _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
     _SetWidgetText(ID_TEXT_00_Copy5, _acWeather);
     _SetWidgetText(ID_TEXT_00_Copy6, _acRange);
@@ -675,6 +921,78 @@ static void _SetSpeedSample(unsigned Raw, unsigned Speed, int Report) {
   _RefreshControlTelemetry();
   if (Report) {
     printf("[VehicleUI] ADC speed raw=0x%03X, speed=%u km/h\r\n", _SpeedAdcRaw, _SpeedKmh);
+  }
+}
+
+static void _RefreshPhonePage(void) {
+  if (_ActivePage != HMI_PAGE_PHONE) {
+    return;
+  }
+  if (_acPhoneNumber[0] == 0) {
+    _SetWidgetText(ID_TEXT_00_Copy, "Enter number");
+    _SetWidgetText(ID_TEXT_00_Copy3, "NO CALL");
+  } else {
+    _SetWidgetText(ID_TEXT_00_Copy, _acPhoneNumber);
+    _SetWidgetText(ID_TEXT_00_Copy3, "DIAL READY");
+  }
+}
+
+static int _GetPhoneKeyAt(int x, int y, char * pKey) {
+  static const char Keys[12] = { '1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#' };
+  int Col;
+  int Row;
+  int x0;
+  int y0;
+
+  if ((x < 286) || (x > 502) || (y < 140) || (y > 326)) {
+    return 0;
+  }
+  Col = (x - 286) / 76;
+  Row = (y - 140) / 48;
+  x0 = 286 + Col * 76;
+  y0 = 140 + Row * 48;
+  if ((Col < 0) || (Col > 2) || (Row < 0) || (Row > 3)) {
+    return 0;
+  }
+  if ((x > (x0 + 64)) || (y > (y0 + 38))) {
+    return 0;
+  }
+  *pKey = Keys[Row * 3 + Col];
+  return 1;
+}
+
+static void _InputPhoneKey(char Key, int Report) {
+  unsigned Len;
+
+  Len = (unsigned)strlen(_acPhoneNumber);
+  if (Key == '*') {
+    _acPhoneNumber[0] = 0;
+  } else if (Key == '#') {
+    if (Len > 0U) {
+      _acPhoneNumber[Len - 1U] = 0;
+    }
+  } else if (Len < (sizeof(_acPhoneNumber) - 1U)) {
+    _acPhoneNumber[Len] = Key;
+    _acPhoneNumber[Len + 1U] = 0;
+  }
+#ifndef WIN32
+  Buzzer_Play(BUZZER_SOUND_CLICK);
+#endif
+  _RefreshPhonePage();
+  _RefreshVehicleScreen();
+  if (Report) {
+    printf("[VehicleUI] PHONE=%s\r\n", _acPhoneNumber[0] ? _acPhoneNumber : "(empty)");
+  }
+}
+
+static void _PlayAudioTune(int Report) {
+#ifndef WIN32
+  Buzzer_Play(BUZZER_SOUND_TUNE);
+#endif
+  _SetWidgetText(ID_TEXT_00_Copy3, "PLAYING");
+  _RefreshVehicleScreen();
+  if (Report) {
+    printf("[VehicleUI] Applied AUDIO=TUNE\r\n");
   }
 }
 
@@ -715,9 +1033,13 @@ static void _SelectPage(HMI_PAGE Page, int Report) {
     _ApplyPageText(Page);
   } else {
     _ApplyPageText(Page);
-    (void)_ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, Report);
+    (void)_ShowMediaMovie(Report);
   }
   _RefreshControlTelemetry();
+  _RefreshPhonePage();
+  if (Page == HMI_PAGE_SETTINGS) {
+    _SetWidgetText(ID_TEXT_00_Copy3, _GetLangCode(_ActiveLang));
+  }
   _PlayPageSound(Page);
   if (Report) {
     printf("[VehicleUI] Applied PAGE=%s\r\n", _GetPageName(Page));
@@ -824,6 +1146,10 @@ static int _FindPage(const char * pValue, HMI_PAGE * pPage) {
     *pPage = HMI_PAGE_SETTINGS;
     return 1;
   }
+  if ((strstr(pValue, "CALENDAR") == pValue) || (strstr(pValue, "OFF") == pValue)) {
+    *pPage = HMI_PAGE_OFF;
+    return 1;
+  }
   for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
     if (strstr(pValue, _aNavItem[i].pName) == pValue) {
       *pPage = _aNavItem[i].Page;
@@ -921,6 +1247,16 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
     }
     _SetVolumePercent((unsigned)atoi(pValue), Report);
     return 1;
+  } else if ((pValue = _FindValue(pLine, "PHONE=")) != NULL) {
+    _CopyText(_acPhoneNumber, sizeof(_acPhoneNumber), pValue);
+    _RefreshPhonePage();
+    if (Report) {
+      printf("[VehicleUI] PHONE=%s\r\n", _acPhoneNumber[0] ? _acPhoneNumber : "(empty)");
+    }
+    return 1;
+  } else if (strstr(pLine, "AUDIO=TUNE") != NULL) {
+    _PlayAudioTune(Report);
+    return 1;
   } else if ((pValue = _FindValue(pLine, "PAGE=")) != NULL) {
     if (_FindPage(pValue, &Page)) {
       _SelectPage(Page, Report);
@@ -928,16 +1264,13 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
     }
   } else if ((pValue = _FindValue(pLine, "LANG=")) != NULL) {
     if (strstr(pValue, "DE") == pValue) {
-      _ApplyLanguage(1);
-      if (Report) {
-        printf("[VehicleUI] Applied LANG=DE\r\n");
-      }
+      (void)_ApplyLanguage(1, Report);
       return 1;
     } else if (strstr(pValue, "EN") == pValue) {
-      _ApplyLanguage(0);
-      if (Report) {
-        printf("[VehicleUI] Applied LANG=EN\r\n");
-      }
+      (void)_ApplyLanguage(0, Report);
+      return 1;
+    } else if (strstr(pValue, "CN") == pValue) {
+      (void)_ApplyLanguage(2, Report);
       return 1;
     }
   } else if (strstr(pLine, "MEDIA=JPEG") != NULL) {
@@ -962,6 +1295,43 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
 }
 
 #ifndef WIN32
+static int _GetSettingsLangAt(int x, int y, unsigned * pLang) {
+  int i;
+  int x0;
+
+  if ((y < 148) || (y > 196)) {
+    return 0;
+  }
+  for (i = 0; i < 3; i++) {
+    x0 = 290 + i * 78;
+    if ((x >= x0) && (x <= (x0 + 64))) {
+      *pLang = (unsigned)i;
+      return 1;
+    }
+  }
+  return 0;
+}
+
+static void _HandleFeatureTouch(int x, int y) {
+  char Key;
+  unsigned Lang;
+
+  if (_ActivePage == HMI_PAGE_PHONE) {
+    if (_GetPhoneKeyAt(x, y, &Key)) {
+      _InputPhoneKey(Key, 1);
+    }
+  } else if (_ActivePage == HMI_PAGE_AUDIO) {
+    if ((x >= 184) && (x <= 616) && (y >= 78) && (y <= 390)) {
+      _PlayAudioTune(1);
+    }
+  } else if (_ActivePage == HMI_PAGE_SETTINGS) {
+    if (_GetSettingsLangAt(x, y, &Lang)) {
+      (void)_ApplyLanguage(Lang, 1);
+      _RefreshVehicleScreen();
+    }
+  }
+}
+
 static void _PollBottomTouch(void) {
   GUI_PID_STATE State;
   HMI_PAGE Page;
@@ -974,6 +1344,8 @@ static void _PollBottomTouch(void) {
   if (State.Pressed && (_LastTouchPressed == 0)) {
     if (_GetBottomPageAt(State.x, State.y, &Page)) {
       _SelectPage(Page, 1);
+    } else {
+      _HandleFeatureTouch(State.x, State.y);
     }
   }
   _LastTouchPressed = State.Pressed ? 1 : 0;

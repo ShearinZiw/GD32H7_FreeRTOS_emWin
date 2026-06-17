@@ -7,6 +7,7 @@ static const uint16_t _aClick[] = { 25, 0 };
 static const uint16_t _aPage[]  = { 22, 28, 28, 0 };
 static const uint16_t _aMedia[] = { 35, 35, 35, 0 };
 static const uint16_t _aPower[] = { 90, 55, 30, 0 };
+static const uint16_t _aTune[]  = { 35, 35, 35, 35, 70, 60, 35, 35, 110, 0 };
 
 static const uint16_t * _pPattern;
 static uint8_t _PatternIndex;
@@ -57,6 +58,9 @@ void Buzzer_Play(BUZZER_SOUND Sound) {
         break;
     case BUZZER_SOUND_POWER:
         _pPattern = _aPower;
+        break;
+    case BUZZER_SOUND_TUNE:
+        _pPattern = _aTune;
         break;
     case BUZZER_SOUND_CLICK:
     default:
