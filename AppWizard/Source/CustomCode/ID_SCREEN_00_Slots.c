@@ -15,6 +15,9 @@ Purpose     : AppWizard managed file, function content could be changed
 #include "IMAGE.h"
 #include "TEXT.h"
 #ifndef WIN32
+  #include "FreeRTOS.h"
+  #include "task.h"
+  #include "portable.h"
   #include "usart/bsp_usart.h"
 #endif
 #include <stdio.h>
@@ -57,9 +60,9 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00_Copy11, 460, 442, 100, 24, "Phone" },
   { ID_TEXT_00_Copy12, 570, 442, 100, 24, "Settings" },
   { ID_TEXT_00_Copy13, 680, 442, 100, 24, "Off" },
-  { ID_TEXT_00_Copy14,   0,   0,   1,  1, "" },
-  { ID_TEXT_00_Copy15,   0,   0,   1,  1, "" },
-  { ID_TEXT_00_Copy19,   0,   0,   1,  1, "" },
+  { ID_TEXT_00_Copy14, 548,  76, 230, 22, "" },
+  { ID_TEXT_00_Copy15, 548, 100, 230, 22, "" },
+  { ID_TEXT_00_Copy19, 548, 124, 230, 22, "" },
 };
 
 static const HMI_LANGUAGE _aLanguage[] = {
@@ -78,7 +81,15 @@ static char _acStatus[24];
 static char _acTemp[24];
 static char _acWeather[40];
 static char _acRange[40];
+static char _acPerf0[48];
+static char _acPerf1[48];
+static char _acPerf2[48];
 static WM_HWIN _hScreen;
+static int _PerfEnabled;
+static unsigned _PaintCount;
+static unsigned _PerfLoopCount;
+static unsigned _LastPerfLoopCount;
+static GUI_TIMER_TIME _LastPerfTime;
 
 static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report);
 
@@ -107,6 +118,95 @@ static void _CopyText(char * pDst, unsigned Size, const char * pSrc) {
   }
   strncpy(pDst, pSrc, Size - 1);
   pDst[Size - 1] = 0;
+}
+
+static void _SetWidgetVisible(int Id, int Visible) {
+  WM_HWIN hItem;
+
+  if (_hScreen == 0) {
+    return;
+  }
+  hItem = WM_GetDialogItem(_hScreen, Id);
+  if (hItem == 0) {
+    return;
+  }
+  if (Visible) {
+    WM_ShowWindow(hItem);
+    WM_BringToTop(hItem);
+  } else {
+    WM_HideWindow(hItem);
+  }
+}
+
+static void _SetPerfVisible(int Visible) {
+  _SetWidgetVisible(ID_TEXT_00_Copy14, Visible);
+  _SetWidgetVisible(ID_TEXT_00_Copy15, Visible);
+  _SetWidgetVisible(ID_TEXT_00_Copy19, Visible);
+  if (_hScreen) {
+    WM_InvalidateWindow(_hScreen);
+  }
+}
+
+static void _UpdatePerfOverlay(int Force) {
+  GUI_TIMER_TIME Now;
+  GUI_TIMER_TIME Delta;
+  unsigned Fps;
+  unsigned LoopDelta;
+  unsigned GuiUsedKB;
+  unsigned GuiFreeKB;
+  unsigned GuiPeakKB;
+  unsigned RtosHeapKB;
+  unsigned TaskCount;
+
+  if ((_PerfEnabled == 0) || (_hScreen == 0)) {
+    return;
+  }
+  Now = GUI_GetTime();
+  Delta = Now - _LastPerfTime;
+  if ((Force == 0) && (Delta < 1000)) {
+    return;
+  }
+  if (Delta == 0) {
+    Delta = 1;
+  }
+  LoopDelta = _PerfLoopCount - _LastPerfLoopCount;
+  Fps = (LoopDelta * 1000U) / (unsigned)Delta;
+  GuiUsedKB = (unsigned)GUI_ALLOC_GetNumUsedBytes() / 1024U;
+  GuiFreeKB = (unsigned)GUI_ALLOC_GetNumFreeBytes() / 1024U;
+  GuiPeakKB = (unsigned)GUI_ALLOC_GetMaxUsedBytes() / 1024U;
+#ifndef WIN32
+  RtosHeapKB = (unsigned)xPortGetFreeHeapSize() / 1024U;
+  TaskCount = (unsigned)uxTaskGetNumberOfTasks();
+#else
+  RtosHeapKB = 0;
+  TaskCount = 0;
+#endif
+  snprintf(_acPerf0, sizeof(_acPerf0), "FPS %u  Paint %u", Fps, _PaintCount);
+  snprintf(_acPerf1, sizeof(_acPerf1), "GUI %uK/%uK peak %uK", GuiUsedKB, GuiFreeKB, GuiPeakKB);
+  snprintf(_acPerf2, sizeof(_acPerf2), "Heap %uK  Tasks %u", RtosHeapKB, TaskCount);
+  _SetWidgetText(ID_TEXT_00_Copy14, _acPerf0);
+  _SetWidgetText(ID_TEXT_00_Copy15, _acPerf1);
+  _SetWidgetText(ID_TEXT_00_Copy19, _acPerf2);
+  _SetPerfVisible(1);
+  _LastPerfTime = Now;
+  _LastPerfLoopCount = _PerfLoopCount;
+}
+
+static void _SetPerfEnabled(int Enabled, int Report) {
+  _PerfEnabled = Enabled ? 1 : 0;
+  if (_PerfEnabled) {
+    _LastPerfTime = GUI_GetTime();
+    _LastPerfLoopCount = _PerfLoopCount;
+    _UpdatePerfOverlay(1);
+    if (Report) {
+      printf("[VehicleUI] Applied PERF=ON\r\n");
+    }
+  } else {
+    _SetPerfVisible(0);
+    if (Report) {
+      printf("[VehicleUI] Applied PERF=OFF\r\n");
+    }
+  }
 }
 
 static void _ApplyLanguage(unsigned Lang) {
@@ -158,11 +258,16 @@ static void _ConfigureText(WM_HWIN hScreen, int Id) {
              (Id == ID_TEXT_00_Copy4)) {
     TEXT_SetFont(hItem, GUI_FONT_32_ASCII_AA4);
     TEXT_SetTextColor(hItem, 0xfff6fbff);
+  } else if ((Id == ID_TEXT_00_Copy14) ||
+             (Id == ID_TEXT_00_Copy15) ||
+             (Id == ID_TEXT_00_Copy19)) {
+    TEXT_SetFont(hItem, GUI_FONT_16B_ASCII);
+    TEXT_SetTextColor(hItem, 0xffffffff);
+    TEXT_SetBkColor(hItem, 0xdd101820);
+    TEXT_SetTextAlign(hItem, GUI_TA_LEFT | GUI_TA_VCENTER);
   } else if ((Id == ID_TEXT_00_Copy2) ||
              (Id == ID_TEXT_00_Copy5) ||
-             (Id == ID_TEXT_00_Copy6) ||
-             (Id == ID_TEXT_00_Copy14) ||
-             (Id == ID_TEXT_00_Copy15)) {
+             (Id == ID_TEXT_00_Copy6)) {
     TEXT_SetFont(hItem, GUI_FONT_20B_ASCII);
     TEXT_SetTextColor(hItem, 0xffcfd8e4);
   } else if (Id == ID_TEXT_00_Copy19) {
@@ -337,6 +442,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
   _CopyText(_acWeather, sizeof(_acWeather), "Partly Cloudy");
   _CopyText(_acRange,   sizeof(_acRange),   "Hi 82   Low 70");
 
+  _SetPerfVisible(0);
   WM_InvalidateWindow(hScreen);
 }
 
@@ -521,6 +627,14 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
       printf("[VehicleUI] Applied RANGE=%s\r\n", _acRange);
     }
     return 1;
+  } else if ((pValue = _FindValue(pLine, "PERF=")) != NULL) {
+    if (strstr(pValue, "ON") == pValue) {
+      _SetPerfEnabled(1, Report);
+      return 1;
+    } else if (strstr(pValue, "OFF") == pValue) {
+      _SetPerfEnabled(0, Report);
+      return 1;
+    }
   } else if ((pValue = _FindValue(pLine, "LANG=")) != NULL) {
     if (strstr(pValue, "DE") == pValue) {
       _ApplyLanguage(1);
@@ -561,6 +675,7 @@ void VehicleUI_Exec(void) {
   uint8_t Byte;
   char c;
 
+  _PerfLoopCount++;
   for (Count = 0; Count < 16; Count++) {
     if (Debug_USART_ReadByte(&Byte) == 0) {
       break;
@@ -589,6 +704,7 @@ void VehicleUI_Exec(void) {
       _RxLen = 0;
     }
   }
+  _UpdatePerfOverlay(0);
 #endif
 }
 
@@ -614,6 +730,7 @@ void cbID_SCREEN_00(WM_MESSAGE * pMsg) {
       _InitDashboard(pMsg->hWin);
     }
     _PaintDashboard();
+    _PaintCount++;
     break;
   case WM_NOTIFY_PARENT: {
     int NCode = pMsg->Data.v;
