@@ -16,7 +16,6 @@
 
 #include "GUI.h"
 #include "ff.h"
-#include <string.h>
 #include <stdio.h>
 
 /*===========================================================================
@@ -24,10 +23,41 @@
  *===========================================================================*/
 #define FS_DRIVE_SD         "0:"    /* SD card (FatFS drive 0) */
 #define FS_DRIVE_OSPI       "1:"    /* OSPI Flash (FatFS drive 1) */
+#define FS_MAX_OPEN_FILES   8
 
 static FATFS _g_sd_fs;
 static FATFS _g_ospi_fs;
 static int    _g_fs_ready = 0;
+
+typedef struct {
+    FIL File;
+    U32 Size;
+    U8  InUse;
+} FS_FILE_HANDLE;
+
+static FS_FILE_HANDLE _aFileHandle[FS_MAX_OPEN_FILES];
+
+static FS_FILE_HANDLE *_AllocFileHandle(void)
+{
+    int i;
+
+    for (i = 0; i < FS_MAX_OPEN_FILES; i++) {
+        if (_aFileHandle[i].InUse == 0) {
+            _aFileHandle[i].InUse = 1;
+            _aFileHandle[i].Size = 0;
+            return &_aFileHandle[i];
+        }
+    }
+    return NULL;
+}
+
+static void _ReleaseFileHandle(FS_FILE_HANDLE *pHandle)
+{
+    if (pHandle) {
+        pHandle->Size = 0;
+        pHandle->InUse = 0;
+    }
+}
 
 /*===========================================================================
  * FS_Init — mount all file systems
@@ -36,7 +66,6 @@ static int    _g_fs_ready = 0;
 int FS_Init(void)
 {
     FRESULT res;
-    char path[4] = "0:/";
 
     printf("[FS] Mounting SD card (%s)...\r\n", FS_DRIVE_SD);
     res = f_mount(&_g_sd_fs, FS_DRIVE_SD, 1);
@@ -70,44 +99,40 @@ int FS_Init(void)
  * emWin IP_FS Interface
  *
  * emWin calls these functions with DOS-style paths like "0:/image.png".
- * We strip the drive prefix and pass the rest to FatFS.
+ * Keep one FatFS FIL open per emWin handle so streamed media, GIF
+ * animation and external fonts can use sequential reads and seeks.
  *===========================================================================*/
-
-static FATFS *_GetFS(const char *sPath) {
-    if (sPath[0] == '0' && sPath[1] == ':') return &_g_sd_fs;
-    if (sPath[0] == '1' && sPath[1] == ':') return &_g_ospi_fs;
-    return &_g_sd_fs;  /* Default to SD card */
-}
-
-static const char *_GetRelPath(const char *sPath) {
-    if (sPath[0] >= '0' && sPath[0] <= '9' && sPath[1] == ':') {
-        return sPath + 2;
-    }
-    return sPath;
-}
 
 /**
  * IP_FS_Open — open a file for reading.
  */
 const void *IP_FS_Open(const char *sPath, U32 *pSize)
 {
-    static FIL file;
+    FS_FILE_HANDLE *pHandle;
     FRESULT res;
 
-    res = f_open(&file, sPath, FA_READ);
-    if (res != FR_OK) {
-        printf("[FS] Open failed: %s (err=%d)\r\n", sPath, res);
+    if (pSize) {
         *pSize = 0;
+    }
+
+    pHandle = _AllocFileHandle();
+    if (pHandle == NULL) {
+        printf("[FS] No free file handles opening: %s\r\n", sPath);
         return NULL;
     }
 
-    *pSize = (U32)f_size(&file);
-    f_close(&file);
+    res = f_open(&pHandle->File, sPath, FA_READ);
+    if (res != FR_OK) {
+        printf("[FS] Open failed: %s (err=%d)\r\n", sPath, res);
+        _ReleaseFileHandle(pHandle);
+        return NULL;
+    }
 
-    /* Return the path as an opaque handle (simplified: re-open on each read) */
-    char *handle = malloc(strlen(sPath) + 1);
-    if (handle) strcpy(handle, sPath);
-    return handle;
+    pHandle->Size = (U32)f_size(&pHandle->File);
+    if (pSize) {
+        *pSize = pHandle->Size;
+    }
+    return pHandle;
 }
 
 /**
@@ -115,7 +140,12 @@ const void *IP_FS_Open(const char *sPath, U32 *pSize)
  */
 void IP_FS_Close(const void *pHandle)
 {
-    if (pHandle) free((void *)pHandle);
+    FS_FILE_HANDLE *pFile = (FS_FILE_HANDLE *)pHandle;
+
+    if (pFile) {
+        f_close(&pFile->File);
+        _ReleaseFileHandle(pFile);
+    }
 }
 
 /**
@@ -123,19 +153,19 @@ void IP_FS_Close(const void *pHandle)
  */
 int IP_FS_Read(void *pBuffer, int ElementSize, int NumElements, const void *pHandle)
 {
-    FIL file;
+    FS_FILE_HANDLE *pFile = (FS_FILE_HANDLE *)pHandle;
     FRESULT res;
-    UINT br;
+    UINT NumBytesRead = 0;
+    UINT NumBytesToRead;
 
-    if (!pHandle) return 0;
+    if ((pFile == NULL) || (pBuffer == NULL) || (ElementSize <= 0) || (NumElements <= 0)) {
+        return 0;
+    }
 
-    res = f_open(&file, (const char *)pHandle, FA_READ);
-    if (res != FR_OK) return 0;
+    NumBytesToRead = (UINT)(ElementSize * NumElements);
+    res = f_read(&pFile->File, pBuffer, NumBytesToRead, &NumBytesRead);
 
-    res = f_read(&file, pBuffer, ElementSize * NumElements, &br);
-    f_close(&file);
-
-    return (res == FR_OK) ? (int)(br / ElementSize) : 0;
+    return (res == FR_OK) ? (int)(NumBytesRead / (UINT)ElementSize) : 0;
 }
 
 /**
@@ -143,17 +173,14 @@ int IP_FS_Read(void *pBuffer, int ElementSize, int NumElements, const void *pHan
  */
 int IP_FS_Seek(const void *pHandle, U32 Off)
 {
-    FIL file;
+    FS_FILE_HANDLE *pFile = (FS_FILE_HANDLE *)pHandle;
     FRESULT res;
 
-    if (!pHandle) return 1;
+    if (pFile == NULL) {
+        return 1;
+    }
 
-    res = f_open(&file, (const char *)pHandle, FA_READ);
-    if (res != FR_OK) return 1;
-
-    res = f_lseek(&file, Off);
-    f_close(&file);
-
+    res = f_lseek(&pFile->File, Off);
     return (res == FR_OK) ? 0 : 1;
 }
 
@@ -162,17 +189,7 @@ int IP_FS_Seek(const void *pHandle, U32 Off)
  */
 U32 IP_FS_GetLen(const void *pHandle)
 {
-    FIL file;
-    FRESULT res;
-    U32 size = 0;
+    FS_FILE_HANDLE *pFile = (FS_FILE_HANDLE *)pHandle;
 
-    if (!pHandle) return 0;
-
-    res = f_open(&file, (const char *)pHandle, FA_READ);
-    if (res != FR_OK) return 0;
-
-    size = (U32)f_size(&file);
-    f_close(&file);
-
-    return size;
+    return (pFile != NULL) ? pFile->Size : 0;
 }
