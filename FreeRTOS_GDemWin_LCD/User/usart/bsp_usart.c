@@ -18,6 +18,49 @@
 	
 #include "usart/bsp_usart.h"
 
+#define DEBUG_USART_RX_BUFFER_SIZE 128U
+
+static volatile uint8_t  _DebugRxBuffer[DEBUG_USART_RX_BUFFER_SIZE];
+static volatile uint16_t _DebugRxWr;
+static volatile uint16_t _DebugRxRd;
+static volatile uint16_t _DebugRxDropped;
+
+static void _DebugUSART_StoreByte(uint8_t Byte) {
+    uint16_t NextWr;
+
+    NextWr = (uint16_t)((_DebugRxWr + 1U) % DEBUG_USART_RX_BUFFER_SIZE);
+    if (NextWr == _DebugRxRd) {
+        _DebugRxDropped++;
+        return;
+    }
+    _DebugRxBuffer[_DebugRxWr] = Byte;
+    _DebugRxWr = NextWr;
+}
+
+int Debug_USART_ReadByte(uint8_t *pByte) {
+    if (_DebugRxRd == _DebugRxWr) {
+        return 0;
+    }
+    *pByte = _DebugRxBuffer[_DebugRxRd];
+    _DebugRxRd = (uint16_t)((_DebugRxRd + 1U) % DEBUG_USART_RX_BUFFER_SIZE);
+    return 1;
+}
+
+void Debug_USART_IRQHandler(void) {
+    if (SET == usart_interrupt_flag_get(DEBUG_USARTX, USART_INT_FLAG_RBNE)) {
+        _DebugUSART_StoreByte((uint8_t)usart_data_receive(DEBUG_USARTX));
+    }
+    if (SET == usart_flag_get(DEBUG_USARTX, USART_FLAG_ORERR)) {
+        usart_flag_clear(DEBUG_USARTX, USART_FLAG_ORERR);
+    }
+    if (SET == usart_flag_get(DEBUG_USARTX, USART_FLAG_NERR)) {
+        usart_flag_clear(DEBUG_USARTX, USART_FLAG_NERR);
+    }
+    if (SET == usart_flag_get(DEBUG_USARTX, USART_FLAG_FERR)) {
+        usart_flag_clear(DEBUG_USARTX, USART_FLAG_FERR);
+    }
+}
+
  /**
   * @brief  USART GPIO 配置,工作参数配置
   * @param  无
@@ -64,6 +107,8 @@ void USART_Config(void)
     // 串口中断优先级配置
 	/* 配置中断源：USART 、配置抢占优先级、 配置响应优先级、使能中断通道*/
     nvic_irq_enable(DEBUG_USART_IRQ, 2U, 2U);
+    usart_interrupt_enable(DEBUG_USARTX, USART_INT_RBNE);
+    usart_interrupt_enable(DEBUG_USARTX, USART_INT_ERR);
     
 	// 使能串口
     usart_enable(DEBUG_USARTX);	      

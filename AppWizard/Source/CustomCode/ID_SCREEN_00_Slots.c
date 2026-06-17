@@ -14,7 +14,11 @@ Purpose     : AppWizard managed file, function content could be changed
 #include "BUTTON.h"
 #include "IMAGE.h"
 #include "TEXT.h"
+#ifndef WIN32
+  #include "usart/bsp_usart.h"
+#endif
 #include <stdio.h>
+#include <string.h>
 
 /*** Begin of user code area ***/
 
@@ -48,9 +52,43 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
 };
 
 static int _ScreenReady;
+static char _acRxLine[80];
+static unsigned _RxLen;
+
+static char _acTime[16];
+static char _acDate[40];
+static char _acSystem[32];
+static char _acStatus[24];
+static char _acTemp[24];
+static char _acWeather[40];
+static char _acRange[40];
+static WM_HWIN _hScreen;
 
 static void _SetWidgetText(int Id, const char * pText) {
+  WM_HWIN hItem;
+
   APPW_SetText(ID_SCREEN_00, Id, (char *)pText);
+  if (_hScreen == 0) {
+    return;
+  }
+  hItem = WM_GetDialogItem(_hScreen, Id);
+  if (hItem == 0) {
+    return;
+  }
+  if (Id == ID_BUTTON_00) {
+    BUTTON_SetText(hItem, pText);
+  } else {
+    TEXT_SetText(hItem, pText);
+  }
+  WM_InvalidateWindow(hItem);
+}
+
+static void _CopyText(char * pDst, unsigned Size, const char * pSrc) {
+  if (Size == 0) {
+    return;
+  }
+  strncpy(pDst, pSrc, Size - 1);
+  pDst[Size - 1] = 0;
 }
 
 static void _SetWidgetPos(WM_HWIN hScreen, int Id, int x, int y, int w, int h) {
@@ -230,6 +268,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
     return;
   }
   _ScreenReady = 1;
+  _hScreen = hScreen;
 
   hBox = WM_GetDialogItem(hScreen, ID_BOX_00);
   if (hBox) {
@@ -251,6 +290,15 @@ static void _InitDashboard(WM_HWIN hScreen) {
 
   _SetWidgetPos(hScreen, ID_BUTTON_00, 238, 418, 106, 56);
   _SetWidgetText(ID_BUTTON_00, "Video");
+
+  _CopyText(_acTime,    sizeof(_acTime),    "10:32");
+  _CopyText(_acDate,    sizeof(_acDate),    "Wednesday, May 27");
+  _CopyText(_acSystem,  sizeof(_acSystem),  "All Systems");
+  _CopyText(_acStatus,  sizeof(_acStatus),  "READY");
+  _CopyText(_acTemp,    sizeof(_acTemp),    "75 F");
+  _CopyText(_acWeather, sizeof(_acWeather), "Partly Cloudy");
+  _CopyText(_acRange,   sizeof(_acRange),   "Hi 82   Low 70");
+
   WM_InvalidateWindow(hScreen);
 }
 
@@ -263,6 +311,150 @@ static void _OnButtonClick(WM_HWIN hScreen) {
     WM_ShowWindow(hImage);
     WM_BringToTop(hImage);
   }
+}
+
+static void _RefreshVehicleScreen(void) {
+  if (_hScreen) {
+    WM_InvalidateWindow(_hScreen);
+  }
+}
+
+static void _SetTextFromCommand(int Id, char * pStore, unsigned StoreSize, const char * pValue) {
+  _CopyText(pStore, StoreSize, pValue);
+  _SetWidgetText(Id, pStore);
+  _RefreshVehicleScreen();
+}
+
+static void _SetTemperature(const char * pValue) {
+  if ((strchr(pValue, 'F') == NULL) && (strchr(pValue, 'C') == NULL)) {
+    snprintf(_acTemp, sizeof(_acTemp), "%s F", pValue);
+  } else {
+    _CopyText(_acTemp, sizeof(_acTemp), pValue);
+  }
+  _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
+  _RefreshVehicleScreen();
+}
+
+static const char *_FindValue(const char * pLine, const char * pKey) {
+  const char * pValue;
+
+  pValue = strstr(pLine, pKey);
+  return pValue ? pValue + strlen(pKey) : NULL;
+}
+
+static int _ApplySerialCommand(const char * pLine, int Report) {
+  const char * pValue;
+
+  if ((pValue = _FindValue(pLine, "TIME=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00, _acTime, sizeof(_acTime), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied TIME=%s\r\n", _acTime);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "DATE=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy, _acDate, sizeof(_acDate), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied DATE=%s\r\n", _acDate);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "SYSTEM=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied SYSTEM=%s\r\n", _acSystem);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "STATUS=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied STATUS=%s\r\n", _acStatus);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "TEMP=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTemperature(pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied TEMP=%s\r\n", _acTemp);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "WEATHER=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy5, _acWeather, sizeof(_acWeather), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied WEATHER=%s\r\n", _acWeather);
+    }
+    return 1;
+  } else if ((pValue = _FindValue(pLine, "RANGE=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy6, _acRange, sizeof(_acRange), pValue);
+    if (Report) {
+      printf("[VehicleUI] Applied RANGE=%s\r\n", _acRange);
+    }
+    return 1;
+  } else if (strstr(pLine, "MEDIA=JPEG") != NULL) {
+    if (_hScreen) {
+      _OnButtonClick(_hScreen);
+    }
+    if (Report) {
+      printf("[VehicleUI] Applied MEDIA=JPEG\r\n");
+    }
+    return 1;
+  }
+  return 0;
+}
+
+void VehicleUI_Exec(void) {
+#ifndef WIN32
+  int Count;
+  uint8_t Byte;
+  char c;
+
+  for (Count = 0; Count < 16; Count++) {
+    if (Debug_USART_ReadByte(&Byte) == 0) {
+      break;
+    }
+    c = (char)Byte;
+    if ((c == '\r') || (c == '\n')) {
+      if (_RxLen > 0) {
+        _acRxLine[_RxLen] = 0;
+        if (_ApplySerialCommand(_acRxLine, 1) == 0) {
+          printf("[VehicleUI] Ignored RX line: %s\r\n", _acRxLine);
+        }
+        _RxLen = 0;
+      }
+    } else if ((c < 32) || (c > 126)) {
+      _RxLen = 0;
+    } else if (_RxLen < (sizeof(_acRxLine) - 1)) {
+      _acRxLine[_RxLen++] = c;
+      _acRxLine[_RxLen] = 0;
+      if (strstr(_acRxLine, "MEDIA=JPEG") != NULL) {
+        (void)_ApplySerialCommand(_acRxLine, 1);
+        _RxLen = 0;
+      } else {
+        (void)_ApplySerialCommand(_acRxLine, 0);
+      }
+    } else {
+      _RxLen = 0;
+    }
+  }
+#endif
 }
 
 /*** End of user code area ***/

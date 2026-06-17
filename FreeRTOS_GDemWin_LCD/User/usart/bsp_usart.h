@@ -32,5 +32,7 @@ void USART_Config(void);
 void Usart_SendByte( uint32_t usart_periph, uint8_t ch);
 void Usart_SendString( uint32_t usart_periph, char *str);
 void Usart_SendHalfWord( uint32_t usart_periph, uint16_t ch);
+int Debug_USART_ReadByte(uint8_t *pByte);
+void Debug_USART_IRQHandler(void);
 
 #endif /* __BSP_USART_H */

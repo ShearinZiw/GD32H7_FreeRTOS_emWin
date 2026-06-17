@@ -18,6 +18,8 @@ Purpose     : AppWizard application entry point
 #include "GUI.h"
 #include <string.h>
 
+extern void VehicleUI_Exec(void);
+
 static int _cbGetFontData(U32 Off, U16 NumBytes, void *pVoid, void *pBuffer) {
   const unsigned char *pFontData = (const unsigned char *)pVoid;
   memcpy(pBuffer, pFontData + Off, NumBytes);
@@ -40,6 +42,7 @@ void MainTask(void) {
   APPW_CreatePersistentScreens();
   APPW_CreateRoot(APPW_INITIAL_SCREEN, WM_HBKWIN);
   for (APPW_Run = 1; APPW_Run; ) {
+    VehicleUI_Exec();
     APPW_Exec();
     GUI_X_Delay(5);
   }

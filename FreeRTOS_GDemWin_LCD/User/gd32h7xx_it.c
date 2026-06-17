@@ -35,6 +35,7 @@ OF SUCH DAMAGE.
 #include "gd32h7xx_it.h"
 #include "main.h"
 #include "systick/systick.h"
+#include "usart/bsp_usart.h"
 #include <stdio.h>
 
 /* Quick blink on LED1 for visual fault indication */
@@ -95,6 +96,11 @@ void DebugMon_Handler(void)
     /* if DebugMon exception occurs, go to infinite loop */
     while(1) {
     }
+}
+
+void USART0_IRQHandler(void)
+{
+    Debug_USART_IRQHandler();
 }
 
 /*
