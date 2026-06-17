@@ -21,6 +21,7 @@
 #include "lcd/bsp_lcd.h"
 #include "sdram/bsp_exmc_sdram.h"
 #include "led/bsp_gpio_led.h"
+#include "led/bsp_buzzer.h"
 #include "sdio/bsp_sdio_sdcard.h"
 #include <stdio.h>
 
@@ -80,7 +81,8 @@ static void HW_Init(void)
     LCD_LayerInit();
     printf("LCD OK | ");
     LED_GPIO_Config();
-    printf("LED OK\r\n");
+    Buzzer_GPIO_Config();
+    printf("LED OK | BEEP OK\r\n");
     printf("Starting FreeRTOS...\r\n");
 }
 

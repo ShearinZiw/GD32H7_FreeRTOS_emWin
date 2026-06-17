@@ -18,6 +18,7 @@ Purpose     : AppWizard managed file, function content could be changed
   #include "FreeRTOS.h"
   #include "task.h"
   #include "portable.h"
+  #include "led/bsp_buzzer.h"
   #include "usart/bsp_usart.h"
 #endif
 #include <stdio.h>
@@ -45,6 +46,33 @@ typedef struct {
   const char * pOff;
 } HMI_LANGUAGE;
 
+typedef enum {
+  HMI_PAGE_NAVIGATION = 0,
+  HMI_PAGE_AUDIO,
+  HMI_PAGE_VIDEO,
+  HMI_PAGE_VEHICLE,
+  HMI_PAGE_PHONE,
+  HMI_PAGE_SETTINGS,
+  HMI_PAGE_OFF
+} HMI_PAGE;
+
+typedef struct {
+  HMI_PAGE Page;
+  int x0;
+  int x1;
+  const char * pName;
+} HMI_NAV_ITEM;
+
+typedef struct {
+  const char * pMain;
+  const char * pSub;
+  const char * pSystem;
+  const char * pStatus;
+  const char * pTemp;
+  const char * pWeather;
+  const char * pRange;
+} HMI_PAGE_TEXT;
+
 static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00,        206, 126, 390, 76, "10:32" },
   { ID_TEXT_00_Copy,   236,  90, 330, 30, "Wednesday, May 27" },
@@ -70,6 +98,26 @@ static const HMI_LANGUAGE _aLanguage[] = {
   { "GUX Fahrzeugterminal", "Navigation", "Audio", "Medien", "Fahrzeug", "Telefon", "Setup",    "Aus" }
 };
 
+static const HMI_NAV_ITEM _aNavItem[] = {
+  { HMI_PAGE_NAVIGATION,  18, 122, "NAV" },
+  { HMI_PAGE_AUDIO,      128, 232, "AUDIO" },
+  { HMI_PAGE_VIDEO,      238, 342, "VIDEO" },
+  { HMI_PAGE_VEHICLE,    348, 452, "VEHICLE" },
+  { HMI_PAGE_PHONE,      458, 562, "PHONE" },
+  { HMI_PAGE_SETTINGS,   568, 672, "SETTINGS" },
+  { HMI_PAGE_OFF,        678, 782, "OFF" }
+};
+
+static const HMI_PAGE_TEXT _aPageText[] = {
+  { "NAV",     "Route guidance",  "Destination", "HOME",     "45 km",   "Next: Main St", "ETA 13:08" },
+  { "AUDIO",   "Bluetooth Music", "Now Playing", "GD32 Drive","Vol 62%", "Bass +2",       "Source: BT" },
+  { "VIDEO",   "SD Media Center", "Media",       "JPEG",     "GIF/BMP", "Movie ready",   "Use MEDIA=..." },
+  { "10:32",   "Wednesday, May 27","All Systems", "READY",    "75 F",    "Partly Cloudy", "Hi 82   Low 70" },
+  { "PHONE",   "Hands-free",      "Connected",   "NO CALL",  "4G",      "Contacts ready","Last: Alice" },
+  { "SET",     "System Settings", "Display",     "AUTO",     "Bright 80%","LANG EN/DE",  "PERF ON/OFF" },
+  { "OFF",     "Standby Mode",    "Terminal",    "SLEEP",    "--",      "Tap any menu",  "Buzzer armed" }
+};
+
 static int _ScreenReady;
 static char _acRxLine[80];
 static unsigned _RxLen;
@@ -90,8 +138,15 @@ static unsigned _PaintCount;
 static unsigned _PerfLoopCount;
 static unsigned _LastPerfLoopCount;
 static GUI_TIMER_TIME _LastPerfTime;
+static HMI_PAGE _ActivePage = HMI_PAGE_VEHICLE;
+#ifndef WIN32
+static int _LastTouchPressed;
+#endif
 
 static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report);
+static int _ShowMediaMovie(int Report);
+static void _HideMedia(void);
+static void _SelectPage(HMI_PAGE Page, int Report);
 
 static void _SetWidgetText(int Id, const char * pText) {
   WM_HWIN hItem;
@@ -118,6 +173,32 @@ static void _CopyText(char * pDst, unsigned Size, const char * pSrc) {
   }
   strncpy(pDst, pSrc, Size - 1);
   pDst[Size - 1] = 0;
+}
+
+static const char * _GetPageName(HMI_PAGE Page) {
+  unsigned i;
+
+  for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
+    if (_aNavItem[i].Page == Page) {
+      return _aNavItem[i].pName;
+    }
+  }
+  return "UNKNOWN";
+}
+
+static int _GetBottomPageAt(int x, int y, HMI_PAGE * pPage) {
+  unsigned i;
+
+  if ((y < 418) || (y > 472)) {
+    return 0;
+  }
+  for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
+    if ((x >= _aNavItem[i].x0) && (x <= _aNavItem[i].x1)) {
+      *pPage = _aNavItem[i].Page;
+      return 1;
+    }
+  }
+  return 0;
 }
 
 static void _SetWidgetVisible(int Id, int Visible) {
@@ -369,8 +450,67 @@ static void _DrawBottomBar(void) {
   GUI_SetColor(0xdd101820);
   GUI_FillRect(0, 404, 799, 479);
   for (i = 0, x = 18; i < 7; i++, x += 110) {
-    _DrawNavItem(x, x + 104, i == 2);
+    _DrawNavItem(x, x + 104, i == (int)_ActivePage);
   }
+}
+
+static void _DrawFeaturePanel(void) {
+  GUI_POINT play[] = { { 374, 178 }, { 374, 258 }, { 454, 218 } };
+
+  GUI_SetColor(0xaa101820);
+  GUI_FillRoundedRect(184, 78, 616, 390, 8);
+  GUI_SetColor(0x55364755);
+  GUI_DrawRoundedRect(184, 78, 616, 390, 8);
+  GUI_SetColor(0xffe8f0f8);
+  GUI_SetPenSize(4);
+
+  switch (_ActivePage) {
+  case HMI_PAGE_NAVIGATION:
+    GUI_DrawLine(296, 310, 378, 230);
+    GUI_DrawLine(378, 230, 470, 266);
+    GUI_DrawLine(470, 266, 548, 162);
+    GUI_FillCircle(296, 310, 9);
+    GUI_FillCircle(548, 162, 12);
+    GUI_SetPenSize(2);
+    GUI_DrawLine(532, 166, 548, 146);
+    GUI_DrawLine(548, 146, 564, 166);
+    break;
+  case HMI_PAGE_AUDIO:
+    GUI_DrawCircle(400, 226, 46);
+    GUI_DrawCircle(400, 226, 18);
+    GUI_DrawLine(456, 180, 456, 292);
+    GUI_DrawLine(456, 180, 522, 164);
+    GUI_DrawLine(522, 164, 522, 270);
+    GUI_FillCircle(442, 292, 18);
+    GUI_FillCircle(508, 270, 18);
+    break;
+  case HMI_PAGE_VIDEO:
+    GUI_DrawRoundedRect(280, 132, 520, 302, 10);
+    GUI_FillPolygon(play, GUI_COUNTOF(play), 0, 0);
+    break;
+  case HMI_PAGE_PHONE:
+    GUI_DrawArc(400, 224, 78, 78, 210, 330);
+    GUI_FillRoundedRect(324, 282, 382, 328, 12);
+    GUI_FillRoundedRect(418, 282, 476, 328, 12);
+    GUI_DrawLine(354, 282, 446, 282);
+    break;
+  case HMI_PAGE_SETTINGS:
+    GUI_DrawLine(318, 164, 514, 164);
+    GUI_DrawLine(318, 224, 514, 224);
+    GUI_DrawLine(318, 284, 514, 284);
+    GUI_FillCircle(384, 164, 14);
+    GUI_FillCircle(456, 224, 14);
+    GUI_FillCircle(360, 284, 14);
+    break;
+  case HMI_PAGE_OFF:
+    GUI_DrawCircle(400, 214, 72);
+    GUI_DrawLine(400, 126, 400, 210);
+    break;
+  case HMI_PAGE_VEHICLE:
+  default:
+    break;
+  }
+  GUI_SetPenSize(1);
 }
 
 static void _DrawTopIcons(void) {
@@ -395,10 +535,19 @@ static void _DrawTopIcons(void) {
 static void _PaintDashboard(void) {
   GUI_SetBkColor(0xff101418);
   GUI_Clear();
-  _DrawRoadScene();
-  _DrawCarStatusIcon();
-  _DrawWeatherIcon();
-  _DrawTopIcons();
+  if (_ActivePage == HMI_PAGE_OFF) {
+    GUI_DrawGradientV(0, 0, 799, 479, 0xff05080c, 0xff14191f);
+    _DrawFeaturePanel();
+  } else {
+    _DrawRoadScene();
+    if (_ActivePage == HMI_PAGE_VEHICLE) {
+      _DrawCarStatusIcon();
+      _DrawWeatherIcon();
+    } else {
+      _DrawFeaturePanel();
+    }
+    _DrawTopIcons();
+  }
   _DrawBottomBar();
 }
 
@@ -448,7 +597,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
 
 static void _OnButtonClick(WM_HWIN hScreen) {
   GUI_USE_PARA(hScreen);
-  (void)_ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, 1);
+  _SelectPage(HMI_PAGE_VIDEO, 1);
 }
 
 static void _RefreshVehicleScreen(void) {
@@ -473,6 +622,52 @@ static void _SetTemperature(const char * pValue) {
   _RefreshVehicleScreen();
 }
 
+static void _PlayPageSound(HMI_PAGE Page) {
+#ifndef WIN32
+  if (Page == HMI_PAGE_OFF) {
+    Buzzer_Play(BUZZER_SOUND_POWER);
+  } else if (Page == HMI_PAGE_VIDEO) {
+    Buzzer_Play(BUZZER_SOUND_MEDIA);
+  } else {
+    Buzzer_Play(BUZZER_SOUND_PAGE);
+  }
+#else
+  GUI_USE_PARA(Page);
+#endif
+}
+
+static void _ApplyPageText(HMI_PAGE Page) {
+  const HMI_PAGE_TEXT * pText;
+
+  pText = &_aPageText[(unsigned)Page];
+  _SetTextFromCommand(ID_TEXT_00,       _acTime,    sizeof(_acTime),    pText->pMain);
+  _SetTextFromCommand(ID_TEXT_00_Copy,  _acDate,    sizeof(_acDate),    pText->pSub);
+  _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem,  sizeof(_acSystem),  pText->pSystem);
+  _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus,  sizeof(_acStatus),  pText->pStatus);
+  _SetTextFromCommand(ID_TEXT_00_Copy4, _acTemp,    sizeof(_acTemp),    pText->pTemp);
+  _SetTextFromCommand(ID_TEXT_00_Copy5, _acWeather, sizeof(_acWeather), pText->pWeather);
+  _SetTextFromCommand(ID_TEXT_00_Copy6, _acRange,   sizeof(_acRange),   pText->pRange);
+}
+
+static void _SelectPage(HMI_PAGE Page, int Report) {
+  if ((unsigned)Page >= GUI_COUNTOF(_aPageText)) {
+    return;
+  }
+  _ActivePage = Page;
+  if (Page != HMI_PAGE_VIDEO) {
+    _HideMedia();
+    _ApplyPageText(Page);
+  } else {
+    _ApplyPageText(Page);
+    (void)_ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, Report);
+  }
+  _PlayPageSound(Page);
+  if (Report) {
+    printf("[VehicleUI] Applied PAGE=%s\r\n", _GetPageName(Page));
+  }
+  _RefreshVehicleScreen();
+}
+
 static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report) {
   WM_HWIN hImage;
   int Result;
@@ -483,15 +678,20 @@ static int _ShowMediaImage(const char * pName, const char * pPath, int Format, i
   hImage = WM_GetDialogItem(_hScreen, ID_IMAGE_00);
   Result = (hImage != 0) ? GUI_Demo_ImageFile(pPath, hImage, Format) : 0;
   if (Result == 1) {
+    _ActivePage = HMI_PAGE_VIDEO;
     WM_ShowWindow(hImage);
     WM_BringToTop(hImage);
     _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
     _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), pName);
+#ifndef WIN32
+    Buzzer_Play(BUZZER_SOUND_MEDIA);
+#endif
     if (Report) {
       printf("[VehicleUI] Applied MEDIA=%s\r\n", pName);
     }
     return 1;
   }
+  _ActivePage = HMI_PAGE_VIDEO;
   _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
   _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus),
                       (Result == GUI_DEMO_IMAGE_UNSUPPORTED) ? "PNG LIB" : "NO FILE");
@@ -508,6 +708,7 @@ static int _ShowMediaImage(const char * pName, const char * pPath, int Format, i
 static int _ShowMediaMovie(int Report) {
   WM_HWIN hImage;
 
+  _ActivePage = HMI_PAGE_VIDEO;
   if (_hScreen) {
     hImage = WM_GetDialogItem(_hScreen, ID_IMAGE_00);
     if (hImage) {
@@ -517,6 +718,9 @@ static int _ShowMediaMovie(int Report) {
   if (GUI_Demo_MOVIE("0:/demo.emf", 220, 96, 360, 260)) {
     _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
     _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), "MOVIE");
+#ifndef WIN32
+    Buzzer_Play(BUZZER_SOUND_MEDIA);
+#endif
     if (Report) {
       printf("[VehicleUI] Applied MEDIA=MOVIE\r\n");
     }
@@ -539,8 +743,6 @@ static void _HideMedia(void) {
     if (hImage) {
       WM_HideWindow(hImage);
     }
-    _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "All Systems");
-    _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), "READY");
     WM_InvalidateWindow(_hScreen);
   }
 }
@@ -554,6 +756,26 @@ static int _IsImmediateMediaCommand(const char * pLine) {
          (strstr(pLine, "MEDIA=HIDE")  != NULL);
 }
 
+static int _FindPage(const char * pValue, HMI_PAGE * pPage) {
+  unsigned i;
+
+  if (strstr(pValue, "NAVIGATION") == pValue) {
+    *pPage = HMI_PAGE_NAVIGATION;
+    return 1;
+  }
+  if (strstr(pValue, "SET") == pValue) {
+    *pPage = HMI_PAGE_SETTINGS;
+    return 1;
+  }
+  for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
+    if (strstr(pValue, _aNavItem[i].pName) == pValue) {
+      *pPage = _aNavItem[i].Page;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static const char *_FindValue(const char * pLine, const char * pKey) {
   const char * pValue;
 
@@ -563,6 +785,7 @@ static const char *_FindValue(const char * pLine, const char * pKey) {
 
 static int _ApplySerialCommand(const char * pLine, int Report) {
   const char * pValue;
+  HMI_PAGE Page;
 
   if ((pValue = _FindValue(pLine, "TIME=")) != NULL) {
     if (*pValue == 0) {
@@ -635,6 +858,11 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
       _SetPerfEnabled(0, Report);
       return 1;
     }
+  } else if ((pValue = _FindValue(pLine, "PAGE=")) != NULL) {
+    if (_FindPage(pValue, &Page)) {
+      _SelectPage(Page, Report);
+      return 1;
+    }
   } else if ((pValue = _FindValue(pLine, "LANG=")) != NULL) {
     if (strstr(pValue, "DE") == pValue) {
       _ApplyLanguage(1);
@@ -661,6 +889,7 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
     return _ShowMediaMovie(Report);
   } else if (strstr(pLine, "MEDIA=HIDE") != NULL) {
     _HideMedia();
+    _ApplyPageText(_ActivePage);
     if (Report) {
       printf("[VehicleUI] Applied MEDIA=HIDE\r\n");
     }
@@ -668,6 +897,25 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
   }
   return 0;
 }
+
+#ifndef WIN32
+static void _PollBottomTouch(void) {
+  GUI_PID_STATE State;
+  HMI_PAGE Page;
+
+  State.x = 0;
+  State.y = 0;
+  State.Pressed = 0;
+  State.Layer = 0;
+  GUI_PID_GetState(&State);
+  if (State.Pressed && (_LastTouchPressed == 0)) {
+    if (_GetBottomPageAt(State.x, State.y, &Page)) {
+      _SelectPage(Page, 1);
+    }
+  }
+  _LastTouchPressed = State.Pressed ? 1 : 0;
+}
+#endif
 
 void VehicleUI_Exec(void) {
 #ifndef WIN32
@@ -704,6 +952,8 @@ void VehicleUI_Exec(void) {
       _RxLen = 0;
     }
   }
+  _PollBottomTouch();
+  Buzzer_Service();
   _UpdatePerfOverlay(0);
 #endif
 }
@@ -735,7 +985,8 @@ void cbID_SCREEN_00(WM_MESSAGE * pMsg) {
   case WM_NOTIFY_PARENT: {
     int NCode = pMsg->Data.v;
     int Id = WM_GetId(pMsg->hWinSrc);
-    if (Id == ID_BUTTON_00 && NCode == WM_NOTIFICATION_CLICKED) {
+    if ((Id == ID_BUTTON_00) &&
+        ((NCode == WM_NOTIFICATION_CLICKED) || (NCode == WM_NOTIFICATION_RELEASED))) {
       _OnButtonClick(pMsg->hWin);
     }
     break;

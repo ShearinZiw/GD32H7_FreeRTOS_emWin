@@ -813,6 +813,11 @@
               <FilePath>..\User\led\bsp_gpio_led.c</FilePath>
             </File>
             <File>
+              <FileName>bsp_buzzer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\led\bsp_buzzer.c</FilePath>
+            </File>
+            <File>
               <FileName>systick.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\systick\systick.c</FilePath>
