@@ -129,7 +129,7 @@ static const HMI_NAV_ITEM _aNavItem[] = {
 static const HMI_PAGE_TEXT _aPageText[] = {
   { "NAV",     "Route guidance",  "Destination", "HOME",     "45 km",   "Next: Main St", "ETA 13:08" },
   { "AUDIO",   "Buzzer Music",    "Now Playing", "DI-DI-DI",  "Vol 62%", "Tap center",    "KEY1 - KEY2 +" },
-  { "VIDEO",   "SD Media Center", "Media",       "JPEG",     "GIF/BMP", "Movie ready",   "Use MEDIA=..." },
+  { "VIDEO",   "SD Media Center", "Media",       "MOVIE",    "",        "",              "" },
   { "10:32",   "Wednesday, May 27","All Systems", "READY",    "75 F",    "Partly Cloudy", "000 km/h" },
   { "",        "Enter number",    "",            "NO CALL",  "",        "",              "" },
   { "",        "",                "",            "EN",       "",        "",              "" },
@@ -162,6 +162,8 @@ static unsigned _ActiveLang;
 static unsigned _VolumePercent = 62U;
 static unsigned _SpeedKmh;
 static unsigned _SpeedAdcRaw;
+static int _CalendarYear = 2026;
+static unsigned _CalendarMonth = 6U;
 #ifndef WIN32
 static GUI_FONT _FontZh24;
 static GUI_XBF_DATA _FontZh24Data;
@@ -183,6 +185,7 @@ static void _RefreshControlTelemetry(void);
 static void _RefreshPhonePage(void);
 static const char * _GetLangCode(unsigned Lang);
 static int _ApplyLanguage(unsigned Lang, int Report);
+static void _RefreshVehicleScreen(void);
 
 static void _SetWidgetText(int Id, const char * pText) {
   WM_HWIN hItem;
@@ -257,6 +260,34 @@ static const char * _GetLangCode(unsigned Lang) {
   }
 }
 
+static int _IsChineseActive(void) {
+#ifndef WIN32
+  return ((_ActiveLang == 2U) && _ZhFontReady) ? 1 : 0;
+#else
+  return 0;
+#endif
+}
+
+static void _SetUiLabelFont(void) {
+#ifndef WIN32
+  if (_IsChineseActive()) {
+    GUI_SetFont(&_FontZh24);
+    return;
+  }
+#endif
+  GUI_SetFont(GUI_FONT_16B_ASCII);
+}
+
+static void _SetUiButtonFont(void) {
+#ifndef WIN32
+  if (_IsChineseActive()) {
+    GUI_SetFont(&_FontZh24);
+    return;
+  }
+#endif
+  GUI_SetFont(GUI_FONT_20B_ASCII);
+}
+
 #ifndef WIN32
 static int _cbGetZhFontData(U32 Off, U16 NumBytes, void * pVoid, void * pBuffer) {
   const void * hFile;
@@ -313,6 +344,50 @@ static int _EnsureChineseFont(int Report) {
   return 0;
 }
 #endif
+
+static int _IsLeapYear(int Year) {
+  return (((Year % 4) == 0) && (((Year % 100) != 0) || ((Year % 400) == 0))) ? 1 : 0;
+}
+
+static int _GetMonthDays(int Year, unsigned Month) {
+  static const U8 aDays[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+  if ((Month == 2U) && _IsLeapYear(Year)) {
+    return 29;
+  }
+  if ((Month < 1U) || (Month > 12U)) {
+    return 30;
+  }
+  return aDays[Month - 1U];
+}
+
+static int _GetWeekday(int Year, unsigned Month, unsigned Day) {
+  static const int aMonthOffset[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+
+  if (Month < 3U) {
+    Year--;
+  }
+  return (Year + Year / 4 - Year / 100 + Year / 400 + aMonthOffset[Month - 1U] + (int)Day) % 7;
+}
+
+static void _StepCalendarMonth(int Delta, int Report) {
+  int Month;
+
+  Month = (int)_CalendarMonth + Delta;
+  while (Month < 1) {
+    Month += 12;
+    _CalendarYear--;
+  }
+  while (Month > 12) {
+    Month -= 12;
+    _CalendarYear++;
+  }
+  _CalendarMonth = (unsigned)Month;
+  if (Report) {
+    printf("[VehicleUI] Calendar month=%04d-%02u\r\n", _CalendarYear, _CalendarMonth);
+  }
+  _RefreshVehicleScreen();
+}
 
 static int _GetBottomPageAt(int x, int y, HMI_PAGE * pPage) {
   unsigned i;
@@ -590,12 +665,7 @@ static void _DrawBottomBar(void) {
   GUI_SetColor(0xdd101820);
   GUI_FillRect(0, 404, 799, 479);
   GUI_SetTextMode(GUI_TM_TRANS);
-#ifndef WIN32
-  if ((_ActiveLang == 2U) && _ZhFontReady) {
-    GUI_SetFont(&_FontZh24);
-  } else
-#endif
-  GUI_SetFont(GUI_FONT_16B_ASCII);
+  _SetUiLabelFont();
   for (i = 0; i < GUI_COUNTOF(_aNavItem); i++) {
     _DrawNavItem(_aNavItem[i].x0, _aNavItem[i].x1, _aNavItem[i].Page == _ActivePage);
     Rect.x0 = _aNavItem[i].x0 + 2;
@@ -609,6 +679,13 @@ static void _DrawBottomBar(void) {
 
 static void _DrawPhoneKeypad(void) {
   static const char * aLabels[12] = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "CLR", "0", "DEL" };
+  static const char * aLabelsCn[12] = {
+    "1", "2", "3", "4", "5", "6", "7", "8", "9",
+    "\xE6\xB8\x85\xE7\xA9\xBA",
+    "0",
+    "\xE9\x80\x80\xE6\xA0\xBC"
+  };
+  const char ** ppLabels;
   GUI_RECT Rect;
   int Row;
   int Col;
@@ -616,7 +693,8 @@ static void _DrawPhoneKeypad(void) {
   int x;
   int y;
 
-  GUI_SetFont(GUI_FONT_20B_ASCII);
+  ppLabels = _IsChineseActive() ? aLabelsCn : aLabels;
+  _SetUiButtonFont();
   GUI_SetTextMode(GUI_TM_TRANS);
   for (Row = 0; Row < 4; Row++) {
     for (Col = 0; Col < 3; Col++) {
@@ -631,7 +709,7 @@ static void _DrawPhoneKeypad(void) {
       Rect.x1 = x + 64;
       Rect.y1 = y + 38;
       GUI_SetColor(0xff16202a);
-      GUI_DispStringInRect((char *)aLabels[Index], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+      GUI_DispStringInRect((char *)ppLabels[Index], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
     }
   }
 }
@@ -639,11 +717,18 @@ static void _DrawPhoneKeypad(void) {
 static void _DrawSettingsLanguage(void) {
   GUI_RECT Rect;
   const char * aLang[] = { "EN", "DE", "CN" };
+  const char * aLangCn[] = {
+    "\xE8\x8B\xB1\xE6\x96\x87",
+    "\xE5\xBE\xB7\xE6\x96\x87",
+    "\xE4\xB8\xAD\xE6\x96\x87"
+  };
+  const char ** ppLang;
   int i;
   int x;
 
   GUI_SetTextMode(GUI_TM_TRANS);
-  GUI_SetFont(GUI_FONT_20B_ASCII);
+  ppLang = _IsChineseActive() ? aLangCn : aLang;
+  _SetUiButtonFont();
   for (i = 0; i < 3; i++) {
     x = 290 + i * 78;
     if ((unsigned)i == _ActiveLang) {
@@ -658,19 +743,26 @@ static void _DrawSettingsLanguage(void) {
     Rect.x1 = x + 64;
     Rect.y1 = 196;
     GUI_SetColor((unsigned)i == _ActiveLang ? 0xffffffff : 0xff16202a);
-    GUI_DispStringInRect((char *)aLang[i], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+    GUI_DispStringInRect((char *)ppLang[i], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
   }
-  GUI_SetFont(GUI_FONT_16_ASCII);
   GUI_SetColor(0xffcfd8e4);
-  GUI_DispStringAt("CN font: N/A", 350, 226);
+  _SetUiLabelFont();
+  if (_IsChineseActive()) {
+    GUI_DispStringAt("\xE4\xB8\xAD\xE6\x96\x87", 376, 226);
+  } else {
+    GUI_DispStringAt("CN: 0:/font.xbf", 330, 226);
+  }
 }
 
 static void _DrawCalendarMonth(void) {
   static const char * aWeek[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
   GUI_RECT Rect;
   char acDay[4];
+  char acTitle[16];
   int i;
   int Day;
+  int Days;
+  int FirstWeekday;
   int Row;
   int Col;
   int x;
@@ -679,7 +771,19 @@ static void _DrawCalendarMonth(void) {
   GUI_SetTextMode(GUI_TM_TRANS);
   GUI_SetFont(GUI_FONT_16B_ASCII);
   GUI_SetColor(0xfff4f8fc);
-  GUI_DispStringAt("June 2026", 348, 106);
+  snprintf(acTitle, sizeof(acTitle), "%04d-%02u", _CalendarYear, _CalendarMonth);
+  Rect.x0 = 300;
+  Rect.y0 = 96;
+  Rect.x1 = 500;
+  Rect.y1 = 124;
+  GUI_DispStringInRect(acTitle, &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
+  GUI_DrawGradientRoundedV(232, 96, 280, 124, 6, 0xffeef3f7, 0xffaab7c2);
+  GUI_DrawGradientRoundedV(520, 96, 568, 124, 6, 0xffeef3f7, 0xffaab7c2);
+  GUI_SetColor(0xff16202a);
+  GUI_SetFont(GUI_FONT_20B_ASCII);
+  GUI_DispStringAt("<", 252, 100);
+  GUI_DispStringAt(">", 540, 100);
+  GUI_SetFont(GUI_FONT_16B_ASCII);
   for (i = 0; i < 7; i++) {
     Rect.x0 = 230 + i * 50;
     Rect.y0 = 132;
@@ -688,12 +792,14 @@ static void _DrawCalendarMonth(void) {
     GUI_SetColor(0xff9fc7d8);
     GUI_DispStringInRect((char *)aWeek[i], &Rect, GUI_TA_HCENTER | GUI_TA_VCENTER);
   }
-  for (Day = 1; Day <= 30; Day++) {
-    Row = (Day) / 7;
-    Col = (Day) % 7;
+  Days = _GetMonthDays(_CalendarYear, _CalendarMonth);
+  FirstWeekday = _GetWeekday(_CalendarYear, _CalendarMonth, 1U);
+  for (Day = 1; Day <= Days; Day++) {
+    Row = (FirstWeekday + Day - 1) / 7;
+    Col = (FirstWeekday + Day - 1) % 7;
     x = 230 + Col * 50;
     y = 162 + Row * 38;
-    if (Day == 17) {
+    if ((_CalendarYear == 2026) && (_CalendarMonth == 6U) && (Day == 17)) {
       GUI_DrawGradientRoundedV(x + 4, y, x + 42, y + 30, 5, 0xff00b4e8, 0xff008ec2);
       GUI_SetColor(0xffffffff);
     } else {
@@ -1312,9 +1418,25 @@ static int _GetSettingsLangAt(int x, int y, unsigned * pLang) {
   return 0;
 }
 
+static int _GetCalendarStepAt(int x, int y, int * pDelta) {
+  if ((y < 96) || (y > 124)) {
+    return 0;
+  }
+  if ((x >= 232) && (x <= 280)) {
+    *pDelta = -1;
+    return 1;
+  }
+  if ((x >= 520) && (x <= 568)) {
+    *pDelta = 1;
+    return 1;
+  }
+  return 0;
+}
+
 static void _HandleFeatureTouch(int x, int y) {
   char Key;
   unsigned Lang;
+  int CalendarDelta;
 
   if (_ActivePage == HMI_PAGE_PHONE) {
     if (_GetPhoneKeyAt(x, y, &Key)) {
@@ -1328,6 +1450,10 @@ static void _HandleFeatureTouch(int x, int y) {
     if (_GetSettingsLangAt(x, y, &Lang)) {
       (void)_ApplyLanguage(Lang, 1);
       _RefreshVehicleScreen();
+    }
+  } else if (_ActivePage == HMI_PAGE_OFF) {
+    if (_GetCalendarStepAt(x, y, &CalendarDelta)) {
+      _StepCalendarMonth(CalendarDelta, 1);
     }
   }
 }
