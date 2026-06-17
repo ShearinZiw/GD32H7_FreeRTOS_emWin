@@ -22,6 +22,8 @@
 #include "sdram/bsp_exmc_sdram.h"
 #include "led/bsp_gpio_led.h"
 #include "led/bsp_buzzer.h"
+#include "key/bsp_key.h"
+#include "adc/bsp_speed_adc.h"
 #include "sdio/bsp_sdio_sdcard.h"
 #include <stdio.h>
 
@@ -82,7 +84,9 @@ static void HW_Init(void)
     printf("LCD OK | ");
     LED_GPIO_Config();
     Buzzer_GPIO_Config();
-    printf("LED OK | BEEP OK\r\n");
+    BoardKey_Init();
+    SpeedADC_Init();
+    printf("LED OK | BEEP OK | KEY OK | ADC OK\r\n");
     printf("Starting FreeRTOS...\r\n");
 }
 

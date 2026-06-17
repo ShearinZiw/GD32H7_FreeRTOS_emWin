@@ -19,9 +19,12 @@ Purpose     : AppWizard managed file, function content could be changed
   #include "task.h"
   #include "portable.h"
   #include "led/bsp_buzzer.h"
+  #include "key/bsp_key.h"
+  #include "adc/bsp_speed_adc.h"
   #include "usart/bsp_usart.h"
 #endif
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /*** Begin of user code area ***/
@@ -112,9 +115,9 @@ static const HMI_PAGE_TEXT _aPageText[] = {
   { "NAV",     "Route guidance",  "Destination", "HOME",     "45 km",   "Next: Main St", "ETA 13:08" },
   { "AUDIO",   "Bluetooth Music", "Now Playing", "GD32 Drive","Vol 62%", "Bass +2",       "Source: BT" },
   { "VIDEO",   "SD Media Center", "Media",       "JPEG",     "GIF/BMP", "Movie ready",   "Use MEDIA=..." },
-  { "10:32",   "Wednesday, May 27","All Systems", "READY",    "75 F",    "Partly Cloudy", "Hi 82   Low 70" },
+  { "10:32",   "Wednesday, May 27","All Systems", "READY",    "000 km/h","Volume 62%",    "ADC 0x000" },
   { "PHONE",   "Hands-free",      "Connected",   "NO CALL",  "4G",      "Contacts ready","Last: Alice" },
-  { "SET",     "System Settings", "Display",     "AUTO",     "Bright 80%","LANG EN/DE",  "PERF ON/OFF" },
+  { "SET",     "System Settings", "Display",     "AUTO",     "Vol 62%", "Speed ADC",     "PERF ON/OFF" },
   { "OFF",     "Standby Mode",    "Terminal",    "SLEEP",    "--",      "Tap any menu",  "Buzzer armed" }
 };
 
@@ -139,14 +142,20 @@ static unsigned _PerfLoopCount;
 static unsigned _LastPerfLoopCount;
 static GUI_TIMER_TIME _LastPerfTime;
 static HMI_PAGE _ActivePage = HMI_PAGE_VEHICLE;
+static unsigned _VolumePercent = 62U;
+static unsigned _SpeedKmh;
+static unsigned _SpeedAdcRaw;
 #ifndef WIN32
 static int _LastTouchPressed;
+static GUI_TIMER_TIME _LastInputTime;
+static GUI_TIMER_TIME _LastAdcTime;
 #endif
 
 static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report);
 static int _ShowMediaMovie(int Report);
 static void _HideMedia(void);
 static void _SelectPage(HMI_PAGE Page, int Report);
+static void _RefreshControlTelemetry(void);
 
 static void _SetWidgetText(int Id, const char * pText) {
   WM_HWIN hItem;
@@ -587,11 +596,12 @@ static void _InitDashboard(WM_HWIN hScreen) {
   _CopyText(_acDate,    sizeof(_acDate),    "Wednesday, May 27");
   _CopyText(_acSystem,  sizeof(_acSystem),  "All Systems");
   _CopyText(_acStatus,  sizeof(_acStatus),  "READY");
-  _CopyText(_acTemp,    sizeof(_acTemp),    "75 F");
-  _CopyText(_acWeather, sizeof(_acWeather), "Partly Cloudy");
-  _CopyText(_acRange,   sizeof(_acRange),   "Hi 82   Low 70");
+  _CopyText(_acTemp,    sizeof(_acTemp),    "000 km/h");
+  _CopyText(_acWeather, sizeof(_acWeather), "Volume 62%");
+  _CopyText(_acRange,   sizeof(_acRange),   "ADC 0x000");
 
   _SetPerfVisible(0);
+  _RefreshControlTelemetry();
   WM_InvalidateWindow(hScreen);
 }
 
@@ -620,6 +630,52 @@ static void _SetTemperature(const char * pValue) {
   }
   _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
   _RefreshVehicleScreen();
+}
+
+static void _RefreshControlTelemetry(void) {
+  if (_ActivePage == HMI_PAGE_VEHICLE) {
+    snprintf(_acTemp, sizeof(_acTemp), "%03u km/h", _SpeedKmh);
+    snprintf(_acWeather, sizeof(_acWeather), "Volume %u%%", _VolumePercent);
+    snprintf(_acRange, sizeof(_acRange), "ADC 0x%03X", _SpeedAdcRaw);
+    _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
+    _SetWidgetText(ID_TEXT_00_Copy5, _acWeather);
+    _SetWidgetText(ID_TEXT_00_Copy6, _acRange);
+  } else if (_ActivePage == HMI_PAGE_AUDIO) {
+    snprintf(_acTemp, sizeof(_acTemp), "Vol %u%%", _VolumePercent);
+    snprintf(_acRange, sizeof(_acRange), "KEY1 -  KEY2 +");
+    _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
+    _SetWidgetText(ID_TEXT_00_Copy6, _acRange);
+  } else if (_ActivePage == HMI_PAGE_SETTINGS) {
+    snprintf(_acTemp, sizeof(_acTemp), "Vol %u%%", _VolumePercent);
+    snprintf(_acWeather, sizeof(_acWeather), "Speed %u km/h", _SpeedKmh);
+    snprintf(_acRange, sizeof(_acRange), "ADC 0x%03X", _SpeedAdcRaw);
+    _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
+    _SetWidgetText(ID_TEXT_00_Copy5, _acWeather);
+    _SetWidgetText(ID_TEXT_00_Copy6, _acRange);
+  }
+}
+
+static void _SetVolumePercent(unsigned Value, int Report) {
+  if (Value > 100U) {
+    Value = 100U;
+  }
+  _VolumePercent = Value;
+  _RefreshControlTelemetry();
+#ifndef WIN32
+  Buzzer_Play(BUZZER_SOUND_CLICK);
+#endif
+  if (Report) {
+    printf("[VehicleUI] Applied VOLUME=%u\r\n", _VolumePercent);
+  }
+}
+
+static void _SetSpeedSample(unsigned Raw, unsigned Speed, int Report) {
+  _SpeedAdcRaw = Raw & 0x0FFFU;
+  _SpeedKmh = Speed;
+  _RefreshControlTelemetry();
+  if (Report) {
+    printf("[VehicleUI] ADC speed raw=0x%03X, speed=%u km/h\r\n", _SpeedAdcRaw, _SpeedKmh);
+  }
 }
 
 static void _PlayPageSound(HMI_PAGE Page) {
@@ -661,6 +717,7 @@ static void _SelectPage(HMI_PAGE Page, int Report) {
     _ApplyPageText(Page);
     (void)_ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, Report);
   }
+  _RefreshControlTelemetry();
   _PlayPageSound(Page);
   if (Report) {
     printf("[VehicleUI] Applied PAGE=%s\r\n", _GetPageName(Page));
@@ -858,6 +915,12 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
       _SetPerfEnabled(0, Report);
       return 1;
     }
+  } else if ((pValue = _FindValue(pLine, "VOLUME=")) != NULL) {
+    if (*pValue == 0) {
+      return 0;
+    }
+    _SetVolumePercent((unsigned)atoi(pValue), Report);
+    return 1;
   } else if ((pValue = _FindValue(pLine, "PAGE=")) != NULL) {
     if (_FindPage(pValue, &Page)) {
       _SelectPage(Page, Report);
@@ -915,6 +978,42 @@ static void _PollBottomTouch(void) {
   }
   _LastTouchPressed = State.Pressed ? 1 : 0;
 }
+
+static void _PollBoardControls(void) {
+  GUI_TIMER_TIME Now;
+  uint8_t KeyEvent;
+  uint16_t Raw;
+  uint16_t Speed;
+  static unsigned LastReportedSpeed;
+
+  Now = GUI_GetTime();
+  if ((Now - _LastInputTime) >= 50) {
+    _LastInputTime = Now;
+    KeyEvent = BoardKey_Scan();
+    if (KeyEvent & BOARD_KEY1_MASK) {
+      if (_VolumePercent >= 5U) {
+        _SetVolumePercent(_VolumePercent - 5U, 1);
+      } else {
+        _SetVolumePercent(0U, 1);
+      }
+    }
+    if (KeyEvent & BOARD_KEY2_MASK) {
+      _SetVolumePercent(_VolumePercent + 5U, 1);
+    }
+  }
+
+  if ((Now - _LastAdcTime) >= 200) {
+    _LastAdcTime = Now;
+    Raw = SpeedADC_ReadRaw();
+    Speed = SpeedADC_RawToKmh(Raw);
+    _SetSpeedSample((unsigned)Raw, (unsigned)Speed, 0);
+    if ((Speed > (LastReportedSpeed + 4U)) ||
+        ((LastReportedSpeed > 4U) && (Speed < (LastReportedSpeed - 4U)))) {
+      LastReportedSpeed = Speed;
+      printf("[VehicleUI] ADC speed raw=0x%03X, speed=%u km/h\r\n", (unsigned)Raw, (unsigned)Speed);
+    }
+  }
+}
 #endif
 
 void VehicleUI_Exec(void) {
@@ -953,6 +1052,7 @@ void VehicleUI_Exec(void) {
     }
   }
   _PollBottomTouch();
+  _PollBoardControls();
   Buzzer_Service();
   _UpdatePerfOverlay(0);
 #endif
