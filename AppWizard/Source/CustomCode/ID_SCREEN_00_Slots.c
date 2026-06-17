@@ -28,23 +28,23 @@ typedef struct {
 } HMI_TEXT_ITEM;
 
 static const HMI_TEXT_ITEM _aTextItem[] = {
-  { ID_TEXT_00,         24,  14, 340, 36, "GD32H7 Industrial HMI" },
-  { ID_TEXT_00_Copy,    24,  58, 220, 28, "Line A / Auto / Running" },
-  { ID_TEXT_00_Copy1,   38, 116, 150, 28, "TEMP" },
-  { ID_TEXT_00_Copy2,   38, 150, 150, 34, "36.5 C" },
-  { ID_TEXT_00_Copy3,  218, 116, 150, 28, "PRESSURE" },
-  { ID_TEXT_00_Copy4,  218, 150, 150, 34, "0.82 MPa" },
-  { ID_TEXT_00_Copy5,  398, 116, 150, 28, "MOTOR" },
-  { ID_TEXT_00_Copy6,  398, 150, 150, 34, "1280 RPM" },
-  { ID_TEXT_00_Copy8,  578, 116, 150, 28, "OUTPUT" },
-  { ID_TEXT_00_Copy9,  578, 150, 150, 34, "72 %" },
-  { ID_TEXT_00_Copy10,  40, 258, 210, 28, "Trend: temp / pressure" },
-  { ID_TEXT_00_Copy11, 456, 258, 180, 28, "Alarm queue" },
-  { ID_TEXT_00_Copy12, 456, 296, 250, 28, "No active alarm" },
-  { ID_TEXT_00_Copy13, 456, 334, 250, 28, "Touch: ready" },
-  { ID_TEXT_00_Copy14, 456, 372, 250, 28, "SD: 0:/demo.jpg" },
-  { ID_TEXT_00_Copy15, 456, 410, 250, 28, "FPS/CPU: pending" },
-  { ID_TEXT_00_Copy19, 612,  22, 150, 28, "Load SD image" },
+  { ID_TEXT_00,        206, 126, 390, 76, "10:32" },
+  { ID_TEXT_00_Copy,   236,  90, 330, 30, "Wednesday, May 27" },
+  { ID_TEXT_00_Copy1,   18,  20, 190, 26, "GUX vehicle terminal" },
+  { ID_TEXT_00_Copy2,  200, 310, 160, 24, "All Systems" },
+  { ID_TEXT_00_Copy3,  198, 340, 170, 38, "READY" },
+  { ID_TEXT_00_Copy4,  574, 306, 150, 52, "75 F" },
+  { ID_TEXT_00_Copy5,  420, 372, 170, 24, "Partly Cloudy" },
+  { ID_TEXT_00_Copy6,  590, 372, 160, 24, "Hi 82   Low 70" },
+  { ID_TEXT_00_Copy8,   24, 442,  82, 24, "Navigation" },
+  { ID_TEXT_00_Copy9,  118, 442,  82, 24, "Audio" },
+  { ID_TEXT_00_Copy10, 304, 442,  82, 24, "Vehicle" },
+  { ID_TEXT_00_Copy11, 398, 442,  82, 24, "Phone" },
+  { ID_TEXT_00_Copy12, 492, 442,  82, 24, "Settings" },
+  { ID_TEXT_00_Copy13, 586, 442,  82, 24, "Off" },
+  { ID_TEXT_00_Copy14,  42, 382, 210, 24, "Touch media to load SD image" },
+  { ID_TEXT_00_Copy15, 544,  20, 170, 26, "Vol  Cam  Home" },
+  { ID_TEXT_00_Copy19,   0,   0,   1,  1, "" },
 };
 
 static int _ScreenReady;
@@ -73,92 +73,152 @@ static void _ConfigureText(WM_HWIN hScreen, int Id) {
 
   TEXT_SetBkColor(hItem, GUI_INVALID_COLOR);
   if (Id == ID_TEXT_00) {
-    TEXT_SetFont(hItem, GUI_FONT_24B_ASCII);
-    TEXT_SetTextColor(hItem, 0xffd8f2ff);
+    TEXT_SetFont(hItem, GUI_FONT_64_ASCII_AA4);
+    TEXT_SetTextColor(hItem, 0xfff0f6ff);
+  } else if (Id == ID_TEXT_00_Copy) {
+    TEXT_SetFont(hItem, GUI_FONT_24_ASCII_AA4);
+    TEXT_SetTextColor(hItem, 0xffbfc8d4);
+  } else if ((Id == ID_TEXT_00_Copy3) ||
+             (Id == ID_TEXT_00_Copy4)) {
+    TEXT_SetFont(hItem, GUI_FONT_32_ASCII_AA4);
+    TEXT_SetTextColor(hItem, 0xfff6fbff);
   } else if ((Id == ID_TEXT_00_Copy2) ||
-             (Id == ID_TEXT_00_Copy4) ||
+             (Id == ID_TEXT_00_Copy5) ||
              (Id == ID_TEXT_00_Copy6) ||
-             (Id == ID_TEXT_00_Copy9)) {
+             (Id == ID_TEXT_00_Copy14) ||
+             (Id == ID_TEXT_00_Copy15)) {
     TEXT_SetFont(hItem, GUI_FONT_20B_ASCII);
+    TEXT_SetTextColor(hItem, 0xffcfd8e4);
+  } else if (Id == ID_TEXT_00_Copy19) {
+    TEXT_SetFont(hItem, GUI_FONT_16B_ASCII);
     TEXT_SetTextColor(hItem, 0xffffffff);
   } else {
     TEXT_SetFont(hItem, GUI_FONT_16_ASCII);
-    TEXT_SetTextColor(hItem, 0xffc8d0d8);
+    TEXT_SetTextColor(hItem, 0xffedf3fa);
   }
 }
 
-static void _DrawCard(int x0, int y0, int x1, int y1, GUI_COLOR Color) {
-  GUI_SetColor(Color);
-  GUI_FillRoundedRect(x0, y0, x1, y1, 6);
-  GUI_SetColor(0xff404040);
-  GUI_DrawRoundedRect(x0, y0, x1, y1, 6);
+static void _DrawRoadScene(void) {
+  GUI_POINT road[] = {
+    { 330, 214 }, { 470, 214 }, { 628, 430 }, { 172, 430 }
+  };
+  GUI_POINT leftField[] = {
+    { 0, 232 }, { 330, 214 }, { 172, 430 }, { 0, 430 }
+  };
+  GUI_POINT rightField[] = {
+    { 470, 214 }, { 799, 232 }, { 799, 430 }, { 628, 430 }
+  };
+  GUI_POINT leftShoulder[] = {
+    { 314, 224 }, { 330, 214 }, { 172, 430 }, { 144, 430 }
+  };
+  GUI_POINT rightShoulder[] = {
+    { 470, 214 }, { 486, 224 }, { 656, 430 }, { 628, 430 }
+  };
+
+  GUI_DrawGradientV(0, 0, 799, 238, 0xff0f334b, 0xff7fa1b0);
+  GUI_SetColor(0xff2c5e3c);
+  GUI_FillPolygon(leftField, GUI_COUNTOF(leftField), 0, 0);
+  GUI_SetColor(0xff3d6b3a);
+  GUI_FillPolygon(rightField, GUI_COUNTOF(rightField), 0, 0);
+  GUI_SetColor(0xff2a2d31);
+  GUI_FillPolygon(road, GUI_COUNTOF(road), 0, 0);
+  GUI_SetColor(0xffd8c66e);
+  GUI_FillPolygon(leftShoulder, GUI_COUNTOF(leftShoulder), 0, 0);
+  GUI_FillPolygon(rightShoulder, GUI_COUNTOF(rightShoulder), 0, 0);
+
+  GUI_SetColor(0xffc7ced5);
+  GUI_FillRect(395, 232, 405, 274);
+  GUI_FillRect(393, 300, 407, 360);
+  GUI_FillRect(390, 390, 410, 430);
+
 }
 
-static void _DrawBar(int x0, int y0, int x1, int y1, int Percent, GUI_COLOR Color) {
-  int Fill;
-
-  if (Percent < 0) {
-    Percent = 0;
-  } else if (Percent > 100) {
-    Percent = 100;
-  }
-  Fill = x0 + ((x1 - x0) * Percent) / 100;
-  GUI_SetColor(0xff303030);
-  GUI_FillRoundedRect(x0, y0, x1, y1, 4);
-  GUI_SetColor(Color);
-  GUI_FillRoundedRect(x0, y0, Fill, y1, 4);
+static void _DrawCarStatusIcon(void) {
+  GUI_SetColor(0xffeef4fb);
+  GUI_SetPenSize(4);
+  GUI_DrawLine(42, 314, 62, 314);
+  GUI_DrawLine(62, 314, 86, 278);
+  GUI_DrawLine(86, 278, 154, 278);
+  GUI_DrawLine(154, 278, 180, 314);
+  GUI_DrawLine(180, 314, 206, 314);
+  GUI_DrawLine(42, 314, 42, 360);
+  GUI_DrawLine(206, 314, 206, 360);
+  GUI_DrawLine(42, 360, 206, 360);
+  GUI_DrawLine(78, 294, 164, 294);
+  GUI_DrawCircle(78, 374, 18);
+  GUI_DrawCircle(170, 374, 18);
+  GUI_SetPenSize(1);
 }
 
-static void _DrawTrend(void) {
-  int i;
-  const int ax = 42;
-  const int ay = 405;
-  const int w = 330;
-  const int h = 112;
-  const int yTemp[]  = { 65, 58, 62, 48, 54, 38, 44, 30, 36, 28, 32 };
-  const int yPress[] = { 88, 82, 78, 84, 72, 76, 64, 70, 58, 62, 52 };
-
-  GUI_SetColor(0xff3a3a3a);
-  for (i = 0; i <= 4; i++) {
-    GUI_DrawLine(ax, ay - i * (h / 4), ax + w, ay - i * (h / 4));
-  }
+static void _DrawWeatherIcon(void) {
+  GUI_SetColor(0xffe8f0f8);
   GUI_SetPenSize(3);
-  GUI_SetColor(0xff35c46a);
-  for (i = 0; i < 10; i++) {
-    GUI_DrawLine(ax + i * 32, ay - yTemp[i], ax + (i + 1) * 32, ay - yTemp[i + 1]);
+  GUI_DrawCircle(488, 324, 24);
+  GUI_DrawLine(488, 284, 488, 296);
+  GUI_DrawLine(448, 324, 460, 324);
+  GUI_DrawLine(516, 296, 526, 286);
+  GUI_DrawLine(460, 296, 450, 286);
+  GUI_DrawArc(522, 340, 28, 20, 0, 180);
+  GUI_DrawCircle(500, 340, 18);
+  GUI_DrawCircle(542, 340, 18);
+  GUI_DrawLine(498, 358, 562, 358);
+  GUI_SetPenSize(1);
+}
+
+static void _DrawNavItem(int x0, int x1, int Selected) {
+  GUI_COLOR Color0;
+  GUI_COLOR Color1;
+
+  if (Selected) {
+    Color0 = 0xff00b4e8;
+    Color1 = 0xff008ec2;
+  } else {
+    Color0 = 0xff8592a2;
+    Color1 = 0xff606c78;
   }
-  GUI_SetColor(0xff2aa8ff);
-  for (i = 0; i < 10; i++) {
-    GUI_DrawLine(ax + i * 32, ay - yPress[i], ax + (i + 1) * 32, ay - yPress[i + 1]);
+  GUI_DrawGradientRoundedV(x0, 418, x1, 472, 5, Color0, Color1);
+  GUI_SetColor(0xff2c333a);
+  GUI_DrawRoundedRect(x0, 418, x1, 472, 5);
+}
+
+static void _DrawBottomBar(void) {
+  int x;
+  int i;
+
+  GUI_SetColor(0xdd101820);
+  GUI_FillRect(0, 404, 799, 479);
+  for (i = 0, x = 18; i < 7; i++, x += 94) {
+    _DrawNavItem(x, x + 88, i == 2);
   }
+}
+
+static void _DrawTopIcons(void) {
+  GUI_SetColor(0xffd8e4ee);
+  GUI_SetPenSize(3);
+  GUI_DrawArc(558, 39, 18, 18, 310, 50);
+  GUI_DrawArc(558, 39, 11, 11, 310, 50);
+  GUI_DrawLine(626, 30, 658, 30);
+  GUI_DrawLine(626, 30, 626, 54);
+  GUI_DrawLine(626, 54, 658, 54);
+  GUI_DrawLine(658, 30, 658, 54);
+  GUI_DrawLine(658, 36, 676, 28);
+  GUI_DrawLine(658, 48, 676, 56);
+  GUI_DrawLine(722, 44, 744, 24);
+  GUI_DrawLine(744, 24, 766, 44);
+  GUI_DrawLine(728, 44, 728, 58);
+  GUI_DrawLine(760, 44, 760, 58);
+  GUI_DrawLine(728, 58, 760, 58);
   GUI_SetPenSize(1);
 }
 
 static void _PaintDashboard(void) {
   GUI_SetBkColor(0xff101418);
   GUI_Clear();
-
-  GUI_SetColor(0xff181f26);
-  GUI_FillRect(0, 0, 799, 479);
-  GUI_SetColor(0xff222a32);
-  GUI_FillRect(0, 0, 799, 64);
-
-  _DrawCard( 24,  96, 188, 212, 0xff1e2b24);
-  _DrawCard(204,  96, 368, 212, 0xff202935);
-  _DrawCard(384,  96, 548, 212, 0xff2a2520);
-  _DrawCard(564,  96, 740, 212, 0xff242431);
-
-  _DrawBar( 38, 192, 174, 202, 58, 0xff35c46a);
-  _DrawBar(218, 192, 354, 202, 82, 0xff2aa8ff);
-  _DrawBar(398, 192, 534, 202, 64, 0xffffb347);
-  _DrawBar(578, 192, 726, 202, 72, 0xffb68cff);
-
-  _DrawCard( 24, 244, 396, 446, 0xff18222b);
-  _DrawCard(436, 244, 740, 446, 0xff201e24);
-  _DrawTrend();
-
-  GUI_SetColor(0xff35c46a);
-  GUI_FillRoundedRect(698, 28, 724, 54, 13);
+  _DrawRoadScene();
+  _DrawCarStatusIcon();
+  _DrawWeatherIcon();
+  _DrawTopIcons();
+  _DrawBottomBar();
 }
 
 static void _InitDashboard(WM_HWIN hScreen) {
@@ -178,7 +238,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
 
   hImage = WM_GetDialogItem(hScreen, ID_IMAGE_00);
   if (hImage) {
-    WM_SetWindowPos(hImage, 378, 84, 400, 300);
+    WM_SetWindowPos(hImage, 220, 96, 360, 260);
     WM_HideWindow(hImage);
   }
 
@@ -189,8 +249,8 @@ static void _InitDashboard(WM_HWIN hScreen) {
     _SetWidgetText(_aTextItem[i].Id, _aTextItem[i].pText);
   }
 
-  _SetWidgetPos(hScreen, ID_BUTTON_00, 586, 22, 110, 32);
-  _SetWidgetText(ID_BUTTON_00, "Load");
+  _SetWidgetPos(hScreen, ID_BUTTON_00, 206, 418, 90, 56);
+  _SetWidgetText(ID_BUTTON_00, "Video");
   WM_InvalidateWindow(hScreen);
 }
 
