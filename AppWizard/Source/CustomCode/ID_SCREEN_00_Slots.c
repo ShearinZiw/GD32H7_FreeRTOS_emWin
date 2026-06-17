@@ -31,6 +31,17 @@ typedef struct {
   const char * pText;
 } HMI_TEXT_ITEM;
 
+typedef struct {
+  const char * pTitle;
+  const char * pNav;
+  const char * pAudio;
+  const char * pVideo;
+  const char * pVehicle;
+  const char * pPhone;
+  const char * pSettings;
+  const char * pOff;
+} HMI_LANGUAGE;
+
 static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00,        206, 126, 390, 76, "10:32" },
   { ID_TEXT_00_Copy,   236,  90, 330, 30, "Wednesday, May 27" },
@@ -51,6 +62,11 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00_Copy19,   0,   0,   1,  1, "" },
 };
 
+static const HMI_LANGUAGE _aLanguage[] = {
+  { "GUX vehicle terminal", "Navigation", "Audio", "Video", "Vehicle",  "Phone",   "Settings", "Off" },
+  { "GUX Fahrzeugterminal", "Navigation", "Audio", "Medien", "Fahrzeug", "Telefon", "Setup",    "Aus" }
+};
+
 static int _ScreenReady;
 static char _acRxLine[80];
 static unsigned _RxLen;
@@ -63,6 +79,8 @@ static char _acTemp[24];
 static char _acWeather[40];
 static char _acRange[40];
 static WM_HWIN _hScreen;
+
+static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report);
 
 static void _SetWidgetText(int Id, const char * pText) {
   WM_HWIN hItem;
@@ -89,6 +107,26 @@ static void _CopyText(char * pDst, unsigned Size, const char * pSrc) {
   }
   strncpy(pDst, pSrc, Size - 1);
   pDst[Size - 1] = 0;
+}
+
+static void _ApplyLanguage(unsigned Lang) {
+  const HMI_LANGUAGE * pLang;
+
+  if (Lang >= GUI_COUNTOF(_aLanguage)) {
+    return;
+  }
+  pLang = &_aLanguage[Lang];
+  _SetWidgetText(ID_TEXT_00_Copy1,  pLang->pTitle);
+  _SetWidgetText(ID_TEXT_00_Copy8,  pLang->pNav);
+  _SetWidgetText(ID_TEXT_00_Copy9,  pLang->pAudio);
+  _SetWidgetText(ID_BUTTON_00,      pLang->pVideo);
+  _SetWidgetText(ID_TEXT_00_Copy10, pLang->pVehicle);
+  _SetWidgetText(ID_TEXT_00_Copy11, pLang->pPhone);
+  _SetWidgetText(ID_TEXT_00_Copy12, pLang->pSettings);
+  _SetWidgetText(ID_TEXT_00_Copy13, pLang->pOff);
+  if (_hScreen) {
+    WM_InvalidateWindow(_hScreen);
+  }
 }
 
 static void _SetWidgetPos(WM_HWIN hScreen, int Id, int x, int y, int w, int h) {
@@ -303,14 +341,8 @@ static void _InitDashboard(WM_HWIN hScreen) {
 }
 
 static void _OnButtonClick(WM_HWIN hScreen) {
-  WM_HWIN hImage;
-
-  hImage = WM_GetDialogItem(hScreen, ID_IMAGE_00);
-  GUI_Demo_JPEG_Image("0:/demo.jpg", hImage);
-  if (hImage) {
-    WM_ShowWindow(hImage);
-    WM_BringToTop(hImage);
-  }
+  GUI_USE_PARA(hScreen);
+  (void)_ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, 1);
 }
 
 static void _RefreshVehicleScreen(void) {
@@ -333,6 +365,87 @@ static void _SetTemperature(const char * pValue) {
   }
   _SetWidgetText(ID_TEXT_00_Copy4, _acTemp);
   _RefreshVehicleScreen();
+}
+
+static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report) {
+  WM_HWIN hImage;
+  int Result;
+
+  if (_hScreen == 0) {
+    return 0;
+  }
+  hImage = WM_GetDialogItem(_hScreen, ID_IMAGE_00);
+  Result = (hImage != 0) ? GUI_Demo_ImageFile(pPath, hImage, Format) : 0;
+  if (Result == 1) {
+    WM_ShowWindow(hImage);
+    WM_BringToTop(hImage);
+    _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
+    _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), pName);
+    if (Report) {
+      printf("[VehicleUI] Applied MEDIA=%s\r\n", pName);
+    }
+    return 1;
+  }
+  _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
+  _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus),
+                      (Result == GUI_DEMO_IMAGE_UNSUPPORTED) ? "PNG LIB" : "NO FILE");
+  if (Report) {
+    if (Result == GUI_DEMO_IMAGE_UNSUPPORTED) {
+      printf("[VehicleUI] MEDIA=%s unsupported by current GDemWin library\r\n", pName);
+    } else {
+      printf("[VehicleUI] Media file missing: %s\r\n", pPath);
+    }
+  }
+  return 0;
+}
+
+static int _ShowMediaMovie(int Report) {
+  WM_HWIN hImage;
+
+  if (_hScreen) {
+    hImage = WM_GetDialogItem(_hScreen, ID_IMAGE_00);
+    if (hImage) {
+      WM_HideWindow(hImage);
+    }
+  }
+  if (GUI_Demo_MOVIE("0:/demo.emf", 220, 96, 360, 260)) {
+    _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
+    _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), "MOVIE");
+    if (Report) {
+      printf("[VehicleUI] Applied MEDIA=MOVIE\r\n");
+    }
+    return 1;
+  }
+  _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "Media");
+  _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), "NO FILE");
+  if (Report) {
+    printf("[VehicleUI] Media file missing: 0:/demo.emf\r\n");
+  }
+  return 0;
+}
+
+static void _HideMedia(void) {
+  WM_HWIN hImage;
+
+  GUI_Demo_StopMovie();
+  if (_hScreen) {
+    hImage = WM_GetDialogItem(_hScreen, ID_IMAGE_00);
+    if (hImage) {
+      WM_HideWindow(hImage);
+    }
+    _SetTextFromCommand(ID_TEXT_00_Copy2, _acSystem, sizeof(_acSystem), "All Systems");
+    _SetTextFromCommand(ID_TEXT_00_Copy3, _acStatus, sizeof(_acStatus), "READY");
+    WM_InvalidateWindow(_hScreen);
+  }
+}
+
+static int _IsImmediateMediaCommand(const char * pLine) {
+  return (strstr(pLine, "MEDIA=JPEG")  != NULL) ||
+         (strstr(pLine, "MEDIA=PNG")   != NULL) ||
+         (strstr(pLine, "MEDIA=GIF")   != NULL) ||
+         (strstr(pLine, "MEDIA=BMP")   != NULL) ||
+         (strstr(pLine, "MEDIA=MOVIE") != NULL) ||
+         (strstr(pLine, "MEDIA=HIDE")  != NULL);
 }
 
 static const char *_FindValue(const char * pLine, const char * pKey) {
@@ -408,12 +521,34 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
       printf("[VehicleUI] Applied RANGE=%s\r\n", _acRange);
     }
     return 1;
-  } else if (strstr(pLine, "MEDIA=JPEG") != NULL) {
-    if (_hScreen) {
-      _OnButtonClick(_hScreen);
+  } else if ((pValue = _FindValue(pLine, "LANG=")) != NULL) {
+    if (strstr(pValue, "DE") == pValue) {
+      _ApplyLanguage(1);
+      if (Report) {
+        printf("[VehicleUI] Applied LANG=DE\r\n");
+      }
+      return 1;
+    } else if (strstr(pValue, "EN") == pValue) {
+      _ApplyLanguage(0);
+      if (Report) {
+        printf("[VehicleUI] Applied LANG=EN\r\n");
+      }
+      return 1;
     }
+  } else if (strstr(pLine, "MEDIA=JPEG") != NULL) {
+    return _ShowMediaImage("JPEG", "0:/demo.jpg", GUI_DEMO_IMAGE_JPEG, Report);
+  } else if (strstr(pLine, "MEDIA=PNG") != NULL) {
+    return _ShowMediaImage("PNG", "0:/demo.png", GUI_DEMO_IMAGE_PNG, Report);
+  } else if (strstr(pLine, "MEDIA=GIF") != NULL) {
+    return _ShowMediaImage("GIF", "0:/demo.gif", GUI_DEMO_IMAGE_GIF, Report);
+  } else if (strstr(pLine, "MEDIA=BMP") != NULL) {
+    return _ShowMediaImage("BMP", "0:/demo.bmp", GUI_DEMO_IMAGE_BMP, Report);
+  } else if (strstr(pLine, "MEDIA=MOVIE") != NULL) {
+    return _ShowMediaMovie(Report);
+  } else if (strstr(pLine, "MEDIA=HIDE") != NULL) {
+    _HideMedia();
     if (Report) {
-      printf("[VehicleUI] Applied MEDIA=JPEG\r\n");
+      printf("[VehicleUI] Applied MEDIA=HIDE\r\n");
     }
     return 1;
   }
@@ -444,7 +579,7 @@ void VehicleUI_Exec(void) {
     } else if (_RxLen < (sizeof(_acRxLine) - 1)) {
       _acRxLine[_RxLen++] = c;
       _acRxLine[_RxLen] = 0;
-      if (strstr(_acRxLine, "MEDIA=JPEG") != NULL) {
+      if (_IsImmediateMediaCommand(_acRxLine)) {
         (void)_ApplySerialCommand(_acRxLine, 1);
         _RxLen = 0;
       } else {

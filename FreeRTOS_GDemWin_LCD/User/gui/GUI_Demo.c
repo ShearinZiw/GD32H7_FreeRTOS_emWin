@@ -15,6 +15,7 @@
 
 #define DEMO_BUF_SIZE  (128 * 1024)   /* 128KB shared buffer for media loading */
 static U8 _demo_buf[DEMO_BUF_SIZE] __attribute__((aligned(32)));
+static GUI_MOVIE_HANDLE _hMovie;
 
 /*===========================================================================
  * Helper: load file from SD into static buffer. Returns size, 0 on error.
@@ -58,6 +59,37 @@ void GUI_Demo_JPEG_Image(const char *path, IMAGE_Handle hImage)
     if (size && hImage) IMAGE_SetJPEG(hImage, _demo_buf, size);
 }
 
+int GUI_Demo_ImageFile(const char *path, IMAGE_Handle hImage, int Format)
+{
+    U32 size;
+
+    GUI_Demo_StopMovie();
+
+    if (Format == GUI_DEMO_IMAGE_PNG) {
+        return GUI_DEMO_IMAGE_UNSUPPORTED;
+    }
+
+    size = _LoadFile(path);
+    if ((size == 0) || (hImage == 0)) {
+        return 0;
+    }
+
+    switch (Format) {
+    case GUI_DEMO_IMAGE_JPEG:
+        IMAGE_SetJPEG(hImage, _demo_buf, size);
+        break;
+    case GUI_DEMO_IMAGE_GIF:
+        IMAGE_SetGIF(hImage, _demo_buf, size);
+        break;
+    case GUI_DEMO_IMAGE_BMP:
+        IMAGE_SetBMP(hImage, _demo_buf, size);
+        break;
+    default:
+        return 0;
+    }
+    return 1;
+}
+
 /*===========================================================================
  * GUI_Demo_GIF — load and display GIF from SD card
  *===========================================================================*/
@@ -83,15 +115,27 @@ void GUI_Demo_BMP(const char *path, int x, int y)
  * (Use JPEG2Movie.exe to convert AVI/JPEG sequence to .mv format)
  *===========================================================================*/
 
-void GUI_Demo_MOVIE(const char *path, int x, int y, int w, int h)
+int GUI_Demo_MOVIE(const char *path, int x, int y, int w, int h)
 {
-    GUI_MOVIE_HANDLE hMovie;
-    U32 size = _LoadFile(path);
-    if (!size) return;
+    U32 size;
 
-    hMovie = GUI_MOVIE_Create(_demo_buf, size, NULL);
-    if (hMovie) {
-        GUI_MOVIE_SetPos(hMovie, x, y);
-        GUI_MOVIE_Show(hMovie, x, y, 1);  /* 1 = loop */
+    GUI_Demo_StopMovie();
+    size = _LoadFile(path);
+    if (!size) return 0;
+    _hMovie = GUI_MOVIE_Create(_demo_buf, size, NULL);
+    if (_hMovie) {
+        GUI_MOVIE_SetPos(_hMovie, x, y);
+        GUI_MOVIE_Show(_hMovie, x, y, 1);  /* 1 = loop */
+    }
+    GUI_USE_PARA(w);
+    GUI_USE_PARA(h);
+    return _hMovie ? 1 : 0;
+}
+
+void GUI_Demo_StopMovie(void)
+{
+    if (_hMovie) {
+        GUI_MOVIE_Delete(_hMovie);
+        _hMovie = 0;
     }
 }
