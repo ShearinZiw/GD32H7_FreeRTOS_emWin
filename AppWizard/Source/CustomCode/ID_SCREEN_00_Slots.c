@@ -36,12 +36,12 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00_Copy4,  574, 306, 150, 52, "75 F" },
   { ID_TEXT_00_Copy5,  420, 372, 170, 24, "Partly Cloudy" },
   { ID_TEXT_00_Copy6,  590, 372, 160, 24, "Hi 82   Low 70" },
-  { ID_TEXT_00_Copy8,   24, 442,  82, 24, "Navigation" },
-  { ID_TEXT_00_Copy9,  118, 442,  82, 24, "Audio" },
-  { ID_TEXT_00_Copy10, 304, 442,  82, 24, "Vehicle" },
-  { ID_TEXT_00_Copy11, 398, 442,  82, 24, "Phone" },
-  { ID_TEXT_00_Copy12, 492, 442,  82, 24, "Settings" },
-  { ID_TEXT_00_Copy13, 586, 442,  82, 24, "Off" },
+  { ID_TEXT_00_Copy8,   20, 442, 100, 24, "Navigation" },
+  { ID_TEXT_00_Copy9,  130, 442, 100, 24, "Audio" },
+  { ID_TEXT_00_Copy10, 350, 442, 100, 24, "Vehicle" },
+  { ID_TEXT_00_Copy11, 460, 442, 100, 24, "Phone" },
+  { ID_TEXT_00_Copy12, 570, 442, 100, 24, "Settings" },
+  { ID_TEXT_00_Copy13, 680, 442, 100, 24, "Off" },
   { ID_TEXT_00_Copy14,  42, 382, 210, 24, "Touch media to load SD image" },
   { ID_TEXT_00_Copy15, 544,  20, 170, 26, "Vol  Cam  Home" },
   { ID_TEXT_00_Copy19,   0,   0,   1,  1, "" },
@@ -100,19 +100,19 @@ static void _ConfigureText(WM_HWIN hScreen, int Id) {
 
 static void _DrawRoadScene(void) {
   GUI_POINT road[] = {
-    { 330, 214 }, { 470, 214 }, { 628, 430 }, { 172, 430 }
+    { 330, 214 }, { 470, 214 }, { 650, 479 }, { 150, 479 }
   };
   GUI_POINT leftField[] = {
-    { 0, 232 }, { 330, 214 }, { 172, 430 }, { 0, 430 }
+    { 0, 232 }, { 330, 214 }, { 150, 479 }, { 0, 479 }
   };
   GUI_POINT rightField[] = {
-    { 470, 214 }, { 799, 232 }, { 799, 430 }, { 628, 430 }
+    { 470, 214 }, { 799, 232 }, { 799, 479 }, { 650, 479 }
   };
   GUI_POINT leftShoulder[] = {
-    { 314, 224 }, { 330, 214 }, { 172, 430 }, { 144, 430 }
+    { 314, 224 }, { 330, 214 }, { 150, 479 }, { 118, 479 }
   };
   GUI_POINT rightShoulder[] = {
-    { 470, 214 }, { 486, 224 }, { 656, 430 }, { 628, 430 }
+    { 470, 214 }, { 486, 224 }, { 682, 479 }, { 650, 479 }
   };
 
   GUI_DrawGradientV(0, 0, 799, 238, 0xff0f334b, 0xff7fa1b0);
@@ -129,7 +129,7 @@ static void _DrawRoadScene(void) {
   GUI_SetColor(0xffc7ced5);
   GUI_FillRect(395, 232, 405, 274);
   GUI_FillRect(393, 300, 407, 360);
-  GUI_FillRect(390, 390, 410, 430);
+  GUI_FillRect(390, 390, 410, 468);
 
 }
 
@@ -187,8 +187,8 @@ static void _DrawBottomBar(void) {
 
   GUI_SetColor(0xdd101820);
   GUI_FillRect(0, 404, 799, 479);
-  for (i = 0, x = 18; i < 7; i++, x += 94) {
-    _DrawNavItem(x, x + 88, i == 2);
+  for (i = 0, x = 18; i < 7; i++, x += 110) {
+    _DrawNavItem(x, x + 104, i == 2);
   }
 }
 
@@ -249,7 +249,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
     _SetWidgetText(_aTextItem[i].Id, _aTextItem[i].pText);
   }
 
-  _SetWidgetPos(hScreen, ID_BUTTON_00, 206, 418, 90, 56);
+  _SetWidgetPos(hScreen, ID_BUTTON_00, 238, 418, 106, 56);
   _SetWidgetText(ID_BUTTON_00, "Video");
   WM_InvalidateWindow(hScreen);
 }
