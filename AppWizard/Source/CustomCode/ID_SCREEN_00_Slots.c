@@ -42,8 +42,8 @@ static const HMI_TEXT_ITEM _aTextItem[] = {
   { ID_TEXT_00_Copy11, 460, 442, 100, 24, "Phone" },
   { ID_TEXT_00_Copy12, 570, 442, 100, 24, "Settings" },
   { ID_TEXT_00_Copy13, 680, 442, 100, 24, "Off" },
-  { ID_TEXT_00_Copy14,  42, 382, 210, 24, "Touch media to load SD image" },
-  { ID_TEXT_00_Copy15, 544,  20, 170, 26, "Vol  Cam  Home" },
+  { ID_TEXT_00_Copy14,   0,   0,   1,  1, "" },
+  { ID_TEXT_00_Copy15,   0,   0,   1,  1, "" },
   { ID_TEXT_00_Copy19,   0,   0,   1,  1, "" },
 };
 
@@ -255,13 +255,7 @@ static void _InitDashboard(WM_HWIN hScreen) {
 }
 
 static void _OnButtonClick(WM_HWIN hScreen) {
-  static int click_cnt = 0;
-  char buf[32];
   WM_HWIN hImage;
-
-  click_cnt++;
-  sprintf(buf, "SD image loaded #%d", click_cnt);
-  _SetWidgetText(ID_TEXT_00_Copy14, buf);
 
   hImage = WM_GetDialogItem(hScreen, ID_IMAGE_00);
   GUI_Demo_JPEG_Image("0:/demo.jpg", hImage);
