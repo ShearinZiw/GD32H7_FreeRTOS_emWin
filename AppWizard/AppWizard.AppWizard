@@ -20,6 +20,7 @@
   <Bitmaps>
     Ext=DARK_Image_DiagLinesGray_40x40.png
     Ext=test.jpg
+    Ext=VehicleUI_Preview_800x480.png
   </Bitmaps>
   <Movies>
   </Movies>
@@ -776,23 +777,23 @@
       IdPrev=0
       IdPost=0
       <Dispose>
-        xSize=480
+        xSize=800
         ySize=480
         <X0>
           Mode=2
-          Off=122
+          Off=0
           Id=0
         </X0>
         <Y0>
           Mode=2
-          Off=-1
+          Off=0
           Id=0
         </Y0>
       </Dispose>
       <SetTile>
       </SetTile>
       <SetSbitmap>
-        Image=DARK_Image_DiagLinesGray_40x40.png
+        Image=VehicleUI_Preview_800x480.png
       </SetSbitmap>
     </Image>
   </Objects>

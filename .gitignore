@@ -40,6 +40,9 @@ JLinkSettings.ini
 # ---------------------------------------------------------------------------
 .vscode/
 .idea/
+**/.vs/
+*.vcxproj.user
+**/Simulation/Exe/
 *.swp
 *.swo
 *~

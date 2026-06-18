@@ -1,5 +1,12 @@
 /*********************************************************************
 *                     SEGGER Microcontroller GmbH                    *
+*        Solutions for real time microcontroller applications        *
+**********************************************************************
+*                                                                    *
+*        (c) 1996 - 2026  SEGGER Microcontroller GmbH                *
+*                                                                    *
+*        Internet: www.segger.com    Support:  support@segger.com    *
+*                                                                    *
 **********************************************************************
 ----------------------------------------------------------------------
 File        : ID_SCREEN_00_Slots.c
@@ -10,11 +17,16 @@ Purpose     : AppWizard managed file, function content could be changed
 #include "Application.h"
 #include "../Generated/Resource.h"
 #include "../Generated/ID_SCREEN_00.h"
-#include "GUI_Demo.h"
+#include "GUI.h"
 #include "BUTTON.h"
 #include "IMAGE.h"
 #include "TEXT.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #ifndef WIN32
+  #include "GUI_Demo.h"
   #include "FreeRTOS.h"
   #include "task.h"
   #include "portable.h"
@@ -23,11 +35,38 @@ Purpose     : AppWizard managed file, function content could be changed
   #include "adc/bsp_speed_adc.h"
   #include "usart/bsp_usart.h"
 #endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 /*** Begin of user code area ***/
+
+#ifdef WIN32
+#define GUI_DEMO_IMAGE_JPEG        0
+#define GUI_DEMO_IMAGE_PNG         1
+#define GUI_DEMO_IMAGE_GIF         2
+#define GUI_DEMO_IMAGE_BMP         3
+#define GUI_DEMO_IMAGE_UNSUPPORTED (-1)
+
+static int GUI_Demo_ImageFile(const char * path, IMAGE_Handle hImage, int Format) {
+  GUI_USE_PARA(path);
+  GUI_USE_PARA(hImage);
+  return (Format == GUI_DEMO_IMAGE_PNG) ? GUI_DEMO_IMAGE_UNSUPPORTED : 1;
+}
+
+static int GUI_Demo_MOVIE(const char * path, int x, int y, int w, int h) {
+  GUI_USE_PARA(path);
+  GUI_SetColor(0xff0d1822);
+  GUI_FillRoundedRect(x, y, x + w, y + h, 8);
+  GUI_SetColor(0xff00b4e8);
+  GUI_DrawRoundedRect(x, y, x + w, y + h, 8);
+  GUI_SetColor(0xffffffff);
+  GUI_SetFont(GUI_FONT_20B_ASCII);
+  GUI_SetTextMode(GUI_TM_TRANS);
+  GUI_DispStringAt("MOVIE", x + 142, y + 110);
+  return 1;
+}
+
+static void GUI_Demo_StopMovie(void) {
+}
+#endif
 
 #ifndef WIN32
 extern const void * IP_FS_Open(const char * sPath, U32 * pSize);
@@ -164,17 +203,17 @@ static unsigned _SpeedKmh;
 static unsigned _SpeedAdcRaw;
 static int _CalendarYear = 2026;
 static unsigned _CalendarMonth = 6U;
-#ifndef WIN32
 static GUI_FONT _FontZh24;
 static GUI_XBF_DATA _FontZh24Data;
 static const void * _hZhFontFile;
 static U32 _ZhFontSize;
 static int _ZhFontReady;
-#endif
-#ifndef WIN32
 static int _LastTouchPressed;
+#ifndef WIN32
 static GUI_TIMER_TIME _LastInputTime;
 static GUI_TIMER_TIME _LastAdcTime;
+#else
+static GUI_TIMER_TIME _LastSimTime;
 #endif
 
 static int _ShowMediaImage(const char * pName, const char * pPath, int Format, int Report);
@@ -261,35 +300,27 @@ static const char * _GetLangCode(unsigned Lang) {
 }
 
 static int _IsChineseActive(void) {
-#ifndef WIN32
   return ((_ActiveLang == 2U) && _ZhFontReady) ? 1 : 0;
-#else
-  return 0;
-#endif
 }
 
 static void _SetUiLabelFont(void) {
-#ifndef WIN32
   if (_IsChineseActive()) {
     GUI_SetFont(&_FontZh24);
     return;
   }
-#endif
   GUI_SetFont(GUI_FONT_16B_ASCII);
 }
 
 static void _SetUiButtonFont(void) {
-#ifndef WIN32
   if (_IsChineseActive()) {
     GUI_SetFont(&_FontZh24);
     return;
   }
-#endif
   GUI_SetFont(GUI_FONT_20B_ASCII);
 }
 
-#ifndef WIN32
 static int _cbGetZhFontData(U32 Off, U16 NumBytes, void * pVoid, void * pBuffer) {
+#ifndef WIN32
   const void * hFile;
 
   hFile = (const void *)pVoid;
@@ -300,19 +331,61 @@ static int _cbGetZhFontData(U32 Off, U16 NumBytes, void * pVoid, void * pBuffer)
     return 1;
   }
   return (IP_FS_Read(pBuffer, 1, NumBytes, hFile) == NumBytes) ? 0 : 1;
+#else
+  FILE * pFile;
+  size_t NumRead;
+
+  pFile = (FILE *)pVoid;
+  if ((pFile == NULL) || (pBuffer == NULL)) {
+    return 1;
+  }
+  if (fseek(pFile, (long)Off, SEEK_SET) != 0) {
+    return 1;
+  }
+  NumRead = fread(pBuffer, 1, NumBytes, pFile);
+  return (NumRead == NumBytes) ? 0 : 1;
+#endif
 }
 
 static int _EnsureChineseFont(int Report) {
   int Result;
+#ifdef WIN32
+  static const char * aFontPath[] = {
+    "..\\Resource\\Font\\NotoSerifSC_24_Normal_EXT_AA4.xbf",
+    "..\\..\\Resource\\Font\\NotoSerifSC_24_Normal_EXT_AA4.xbf",
+    "..\\..\\media\\font.xbf",
+    "font.xbf"
+  };
+  unsigned i;
+#endif
 
   if (_ZhFontReady) {
     return 1;
   }
   if (_hZhFontFile == NULL) {
+#ifndef WIN32
     _hZhFontFile = IP_FS_Open("0:/font.xbf", &_ZhFontSize);
+#else
+    for (i = 0; i < GUI_COUNTOF(aFontPath); i++) {
+      FILE * pFile;
+
+      pFile = fopen(aFontPath[i], "rb");
+      if (pFile) {
+        fseek(pFile, 0, SEEK_END);
+        _ZhFontSize = (U32)ftell(pFile);
+        fseek(pFile, 0, SEEK_SET);
+        _hZhFontFile = pFile;
+        break;
+      }
+    }
+#endif
     if (_hZhFontFile == NULL) {
       if (Report) {
+#ifndef WIN32
         printf("[VehicleUI] LANG=CN failed: missing 0:/font.xbf\r\n");
+#else
+        printf("[VehicleUI] LANG=CN failed: missing simulation XBF font\r\n");
+#endif
       }
       return 0;
     }
@@ -324,7 +397,11 @@ static int _EnsureChineseFont(int Report) {
                               _cbGetZhFontData,
                               (void *)_hZhFontFile);
   if (Result != 0) {
+#ifndef WIN32
     IP_FS_Close(_hZhFontFile);
+#else
+    fclose((FILE *)_hZhFontFile);
+#endif
     _hZhFontFile = NULL;
     _ZhFontSize = 0;
     if (Report) {
@@ -334,16 +411,14 @@ static int _EnsureChineseFont(int Report) {
   }
   _ZhFontReady = 1;
   if (Report) {
+#ifndef WIN32
     printf("[VehicleUI] Loaded Chinese font: 0:/font.xbf (%lu bytes)\r\n", (unsigned long)_ZhFontSize);
+#else
+    printf("[VehicleUI] Loaded simulation Chinese font (%lu bytes)\r\n", (unsigned long)_ZhFontSize);
+#endif
   }
   return 1;
 }
-#else
-static int _EnsureChineseFont(int Report) {
-  GUI_USE_PARA(Report);
-  return 0;
-}
-#endif
 
 static int _IsLeapYear(int Year) {
   return (((Year % 4) == 0) && (((Year % 100) != 0) || ((Year % 400) == 0))) ? 1 : 0;
@@ -853,6 +928,12 @@ static void _DrawFeaturePanel(void) {
   case HMI_PAGE_VIDEO:
     GUI_DrawRoundedRect(280, 132, 520, 302, 10);
     GUI_FillPolygon(play, GUI_COUNTOF(play), 0, 0);
+#ifdef WIN32
+    GUI_SetFont(GUI_FONT_20B_ASCII);
+    GUI_SetTextMode(GUI_TM_TRANS);
+    GUI_SetColor(0xffcfd8e4);
+    GUI_DispStringAt("MOVIE", 372, 322);
+#endif
     break;
   case HMI_PAGE_PHONE:
     _DrawPhoneKeypad();
@@ -1400,7 +1481,6 @@ static int _ApplySerialCommand(const char * pLine, int Report) {
   return 0;
 }
 
-#ifndef WIN32
 static int _GetSettingsLangAt(int x, int y, unsigned * pLang) {
   int i;
   int x0;
@@ -1477,6 +1557,7 @@ static void _PollBottomTouch(void) {
   _LastTouchPressed = State.Pressed ? 1 : 0;
 }
 
+#ifndef WIN32
 static void _PollBoardControls(void) {
   GUI_TIMER_TIME Now;
   uint8_t KeyEvent;
@@ -1552,6 +1633,19 @@ void VehicleUI_Exec(void) {
   _PollBottomTouch();
   _PollBoardControls();
   Buzzer_Service();
+  _UpdatePerfOverlay(0);
+#else
+  GUI_TIMER_TIME Now;
+  unsigned Speed;
+
+  _PerfLoopCount++;
+  _PollBottomTouch();
+  Now = GUI_GetTime();
+  if ((Now - _LastSimTime) >= 200) {
+    _LastSimTime = Now;
+    Speed = (unsigned)((Now / 80) % 240);
+    _SetSpeedSample(Speed << 4, Speed, 0);
+  }
   _UpdatePerfOverlay(0);
 #endif
 }
